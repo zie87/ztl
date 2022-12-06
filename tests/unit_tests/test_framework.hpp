@@ -1,0 +1,12 @@
+#ifndef ZTL_TEST_FRAMEWORK_HPP
+#define ZTL_TEST_FRAMEWORK_HPP
+
+#include "UnitTest++/UnitTest++.h"
+
+#define UT_CHECK UNITTEST_CHECK
+#define UT_CHECK_TRUE UNITTEST_CHECK
+#define UT_CHECK_FALSE(value) UNITTEST_CHECK(!(value))
+
+#define UT_CHECK_EQUAL UNITTEST_CHECK_EQUAL
+
+#endif  // ZTL_TEST_FRAMEWORK_HPP

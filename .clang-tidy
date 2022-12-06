@@ -1,0 +1,44 @@
+---
+Checks: > 
+    -*,
+    cert-*,
+    readability-identifier-naming,
+    readability-*,
+    -readability-named-parameter,
+    -readability-identifier-length,
+    -readability-magic-numbers,
+    llvm-*,
+    modernize-*,
+    -modernize-avoid-c-arrays,
+    bugprone-*,
+    -bugprone-easily-swappable-parameters,
+    hicpp-*,
+    -hicpp-named-parameter,
+    -hicpp-explicit-conversions,
+    -hicpp-avoid-c-arrays,
+    -hicpp-no-array-decay,
+    -hicpp-signed-bitwise,
+    -hicpp-vararg,
+    misc-*,
+    -misc-non-private-member-variables-in-classes,
+    portability-*,
+    performance-*,
+    cppcoreguidelines-*,
+    -cppcoreguidelines-owning-memory,
+    -cppcoreguidelines-avoid-magic-numbers,
+    -cppcoreguidelines-avoid-non-const-global-variables,
+    -cppcoreguidelines-avoid-c-arrays,
+    -cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+    -cppcoreguidelines-pro-bounds-constant-array-index,
+    -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+    -cppcoreguidelines-pro-type-reinterpret-cast,
+    -cppcoreguidelines-pro-type-vararg,
+    fuchsia-*
+    -fuchsia-overloaded-operator,
+    -fuchsia-trailing-return
+WarningsAsErrors: '-*'
+HeaderFilterRegex: '^((?!/build]/).)*$'
+AnalyzeTemporaryDtors: false
+FormatStyle:     file
+CheckOptions:
+...

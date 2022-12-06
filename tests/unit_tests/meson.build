@@ -1,0 +1,23 @@
+unit_tests_srcs = [
+    'main.cpp',
+    'meta/sequence/push_back_test.cpp',
+    'meta/sequence/push_front_test.cpp',
+    'meta/constant/integral_constant_test.cpp',
+    'meta/constant/bool_constant_test.cpp',
+    'meta/type_trait/is_integral_test.cpp',
+    'meta/type_trait/is_same_test.cpp',
+    'meta/type_trait/remove_cv_test.cpp',
+]
+
+subproject('unittest-cpp', default_options: 'warning_level=0')
+unittest_dep = dependency('unittest-cpp')
+unit_tests_inc_dir = include_directories('.')
+unit_tests_exec = executable(
+    'ztl_unit_tests',
+    unit_tests_srcs,
+    include_directories: unit_tests_inc_dir,
+    dependencies: [unittest_dep, ztl_dep],
+    override_options: ['cpp_std=c++20'],
+)
+
+test('ztl tests', unit_tests_exec)
