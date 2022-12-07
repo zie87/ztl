@@ -1,0 +1,98 @@
+name: build
+
+on:
+  push:    
+    branches:
+      - main
+  
+  pull_request:
+    paths:
+      - "**.cpp"
+      - "**.hpp"
+
+jobs:
+
+  linux:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        build_type: [debug, release]
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 1
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+    - run: pip install meson ninja
+    - name: Configure
+      run: meson setup builddir/ --buildtype ${{ matrix.build_type }}
+      env:
+        CC: gcc-12
+        CXX: g++-12
+    - name: Compile
+      run: meson compile -C builddir/ -v
+    - name: Run tests
+      run: meson test -C builddir/ -v --suite ztl
+    - uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: meson_testlog_linux
+        path: builddir/meson-logs/testlog.txt
+        retention-days: 3
+
+  macos:
+    runs-on: macos-12
+    strategy:
+      matrix:
+        build_type: [debug, release]
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 1
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+    - run: pip install meson ninja
+    - name: Configure 
+      run: meson setup builddir/ --buildtype ${{ matrix.build_type }}
+    - name: Compile
+      run: meson compile -C builddir/ -v
+    - name: Run tests
+      run: meson test -C builddir/ -v --suite ztl
+    - uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: meson_testlog_macos
+        path: builddir/meson-logs/testlog.txt
+        retention-days: 3
+
+  windows:
+    runs-on: windows-2022
+    strategy:
+      matrix:
+        build_type: [debug, release]
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 1
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+    - run: pip install meson ninja
+    - uses: bus1/cabuild/action/msdevshell@v1
+      with:
+        architecture: x64
+    - name: Configure 
+      run: meson setup builddir/ --buildtype ${{ matrix.build_type }}
+    - name: Compile
+      run: meson compile -C builddir/ -v
+    - name: Run tests 
+      run: meson test -C builddir/ -v --suite ztl
+    - uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: meson_testlog_windows
+        path: builddir/meson-logs/testlog.txt
+        retention-days: 3
+

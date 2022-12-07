@@ -20,4 +20,4 @@ unit_tests_exec = executable(
     override_options: ['cpp_std=c++20'],
 )
 
-test('ztl tests', unit_tests_exec)
+test('ztl-unit-tests', unit_tests_exec, suite: 'ztl')
