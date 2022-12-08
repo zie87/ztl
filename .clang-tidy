@@ -22,6 +22,7 @@ Checks: >
     -hicpp-signed-bitwise,
     -hicpp-vararg,
     misc-*,
+    -misc-unused-using-decls,
     -misc-non-private-member-variables-in-classes,
     portability-*,
     performance-*,
