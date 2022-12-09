@@ -6,6 +6,9 @@ unit_tests_srcs = [
     'meta/constant/bool_constant_test.cpp',
     'meta/type_trait/is_integral_test.cpp',
     'meta/type_trait/is_same_test.cpp',
+    'meta/type_trait/is_union_test.cpp',
+    'meta/type_trait/is_class_test.cpp',
+    'meta/type_trait/is_base_of_test.cpp',
     'meta/type_trait/remove_cv_test.cpp',
 ]
 
@@ -17,7 +20,7 @@ unit_tests_exec = executable(
     unit_tests_srcs,
     include_directories: unit_tests_inc_dir,
     dependencies: [unittest_dep, ztl_dep],
-    override_options: ['cpp_std=c++20'],
+    override_options: ['cpp_std=c++20', 'warning_level=3'],
 )
 
 test('ztl-unit-tests', unit_tests_exec, suite: 'ztl')

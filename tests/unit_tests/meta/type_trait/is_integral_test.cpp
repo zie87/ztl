@@ -8,7 +8,7 @@ struct test_tag {};
 
 TEST(meta_type_trait_is_integral) {
     UT_CHECK_TRUE((ztl::meta::is_integral_v<bool>));
-    
+
     UT_CHECK_TRUE((ztl::meta::is_integral_v<char>));
     UT_CHECK_TRUE((ztl::meta::is_integral_v<char8_t>));
     UT_CHECK_TRUE((ztl::meta::is_integral_v<char16_t>));
