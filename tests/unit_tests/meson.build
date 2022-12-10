@@ -1,17 +1,19 @@
 unit_tests_srcs = [
-    'meta/constant/bool_constant_test.cpp',
-    'meta/constant/integral_constant_test.cpp',
-    'meta/sequence/push_back_test.cpp',
-    'meta/sequence/push_front_test.cpp',
-    'meta/type_trait/is_base_of_test.cpp',
-    'meta/type_trait/is_class_test.cpp',
-    'meta/type_trait/is_integral_test.cpp',
-    'meta/type_trait/is_same_test.cpp',
-    'meta/type_trait/is_union_test.cpp',
-    'meta/type_trait/remove_cv_test.cpp',
-    'type/byte_test.cpp',
-    'utility/source_location_test.cpp',
-    'main.cpp',
+  'meta/constant/bool_constant_test.cpp',
+  'meta/constant/integral_constant_test.cpp',
+  'meta/sequence/push_back_test.cpp',
+  'meta/sequence/push_front_test.cpp',
+  'meta/type_trait/is_base_of_test.cpp',
+  'meta/type_trait/is_class_test.cpp',
+  'meta/type_trait/is_integral_test.cpp',
+  'meta/type_trait/is_same_test.cpp',
+  'meta/type_trait/is_union_test.cpp',
+  'meta/type_trait/remove_cv_test.cpp',
+  'type/byte_test.cpp',
+  'utility/endian/byteswap_test.cpp',
+'utility/endian/endian_swap_test.cpp',
+  'utility/source_location_test.cpp',
+  'main.cpp'
 ]
 
 subproject('unittest-cpp', default_options: 'warning_level=0')
