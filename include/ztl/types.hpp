@@ -1,6 +1,7 @@
 #ifndef ZTL_TYPES_HPP
 #define ZTL_TYPES_HPP
 
+#include "ztl/type/byte.hpp"
 #include "ztl/type/stddef.hpp"
 #include "ztl/type/stdint.hpp"
 
