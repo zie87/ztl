@@ -10,6 +10,7 @@ unit_tests_srcs = [
     'meta/type_trait/is_class_test.cpp',
     'meta/type_trait/is_base_of_test.cpp',
     'meta/type_trait/remove_cv_test.cpp',
+    'utility/source_location_test.cpp',
 ]
 
 subproject('unittest-cpp', default_options: 'warning_level=0')
