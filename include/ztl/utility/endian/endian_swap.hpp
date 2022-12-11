@@ -36,15 +36,11 @@ requires meta::has_unique_object_representations_v<T>
 
 template <::ztl::endian TO_V, ::ztl::meta::integral T>
 requires meta::has_unique_object_representations_v<T>
-[[nodiscard]] constexpr auto to_endian(T val) noexcept -> T {
-    return endian_swap<endian::native, TO_V, T>(val);
-}
+[[nodiscard]] constexpr auto to_endian(T val) noexcept -> T { return endian_swap<endian::native, TO_V, T>(val); }
 
 template <::ztl::endian FROM_V, ::ztl::meta::integral T>
 requires meta::has_unique_object_representations_v<T>
-[[nodiscard]] constexpr auto from_endian(T val) noexcept -> T {
-    return endian_swap<FROM_V, endian::native, T>(val);
-}
+[[nodiscard]] constexpr auto from_endian(T val) noexcept -> T { return endian_swap<FROM_V, endian::native, T>(val); }
 
 }  // namespace ztl
 

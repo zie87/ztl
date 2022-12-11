@@ -1,5 +1,5 @@
-#ifndef ZTL_META_TYPE_TRAIT_HAS_UNIQUE_OBJECT_REPRESENTATION_HPP
-#define ZTL_META_TYPE_TRAIT_HAS_UNIQUE_OBJECT_REPRESENTATION_HPP
+#ifndef ZTL_META_TYPE_TRAIT_HAS_UNIQUE_OBJECT_REPRESENTATIONS_HPP
+#define ZTL_META_TYPE_TRAIT_HAS_UNIQUE_OBJECT_REPRESENTATIONS_HPP
 
 #include "ztl/meta/constant/bool_constant.hpp"
 #include "ztl/meta/type_trait/remove_all_extents.hpp"
@@ -16,4 +16,4 @@ inline constexpr bool has_unique_object_representations_v = has_unique_object_re
 
 }  // namespace ztl::meta
 
-#endif  // ZTL_META_TYPE_TRAIT_HAS_UNIQUE_OBJECT_REPRESENTATION_HPP
+#endif  // ZTL_META_TYPE_TRAIT_HAS_UNIQUE_OBJECT_REPRESENTATIONS_HPP

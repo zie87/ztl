@@ -10,7 +10,8 @@ namespace ztl {
 
 namespace detail {
 
-// inspired by: https://stackoverflow.com/questions/105252/how-do-i-convert-between-big-endian-and-little-endian-values-in-c
+// inspired by:
+// https://stackoverflow.com/questions/105252/how-do-i-convert-between-big-endian-and-little-endian-values-in-c
 template <typename T, ztl::size_t sz>
 struct byte_swapper {
     static inline constexpr auto swap(T) noexcept -> T {
