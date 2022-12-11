@@ -1,5 +1,5 @@
-#ifndef ZTL_META_TYPE_TRAIT_REMOVE_ALL_EXTENT_HPP
-#define ZTL_META_TYPE_TRAIT_REMOVE_ALL_EXTENT_HPP
+#ifndef ZTL_META_TYPE_TRAIT_REMOVE_ALL_EXTENTS_HPP
+#define ZTL_META_TYPE_TRAIT_REMOVE_ALL_EXTENTS_HPP
 
 #include "ztl/types.hpp"
 
@@ -25,4 +25,4 @@ using remove_all_extents_t = typename remove_all_extents<T>::type;
 
 }  // namespace ztl::meta
 
-#endif  // ZTL_META_TYPE_TRAIT_REMOVE_ALL_EXTENT_HPP
+#endif  // ZTL_META_TYPE_TRAIT_REMOVE_ALL_EXTENTS_HPP

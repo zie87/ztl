@@ -6,7 +6,7 @@
 TEST(utility_endian_endian_swap) {
     {
         const ztl::uint8_t val = 0b00001111;
-        
+
         UT_CHECK_EQUAL((ztl::endian_swap<ztl::endian::big, ztl::endian::big>(val)), val);
         UT_CHECK_EQUAL((ztl::endian_swap<ztl::endian::little, ztl::endian::little>(val)), val);
 
@@ -44,8 +44,7 @@ TEST(utility_endian_endian_swap) {
         UT_CHECK_EQUAL((ztl::endian_swap<ztl::endian::big, ztl::endian::little>(val)), swapped);
     }
 
-    if constexpr (ztl::endian::native == ztl::endian::little)
-    {
+    if constexpr (ztl::endian::native == ztl::endian::little) {
         const ztl::uint32_t val = 0xDEAD'BEEF;
         UT_CHECK_EQUAL((ztl::to_endian<ztl::endian::native>(val)), val);
         UT_CHECK_EQUAL((ztl::to_endian<ztl::endian::little>(val)), val);
