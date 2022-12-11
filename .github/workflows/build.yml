@@ -96,3 +96,40 @@ jobs:
         path: builddir/meson-logs/testlog.txt
         retention-days: 3
 
+  coveralls:
+    runs-on: ubuntu-22.04
+    needs: [linux, windows, macos]
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 1
+    - run: sudo apt update && sudo apt install lcov
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+    - run: pip install meson ninja
+    - name: Configure
+      run: meson setup builddir/ --buildtype debug -Db_coverage=true
+      env:
+        CC: gcc-11
+        CXX: g++-11
+    - name: Compile
+      run: meson compile -C builddir/
+    - name: Lcov prepare
+      working-directory: ${{runner.workspace}}
+      run : |
+        lcov --zerocounters --directory ${{runner.workspace}}/builddir
+        lcov --capture --initial --directory . --output-file cov_base.info
+    - name: Run tests
+      run: meson test -C builddir/ --suite ztl
+    - name: Lcov creation
+      working-directory: ${{runner.workspace}}
+      run : |
+        lcov --capture --directory . --output-file cov.info
+        lcov --add-tracefile ./cov_base.info --add-tracefile ./cov.info --output-file cov_total.info
+        lcov --remove ./cov_total.info '/usr/include/*' '/usr/lib/*' '*/tests/*' '*/subprojects/*' -o cov_filter.info
+    - name: Coveralls
+      uses: coverallsapp/github-action@master
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        path-to-lcov: ${{runner.workspace}}/cov_filter.info
