@@ -8,8 +8,8 @@ TEST(meta_constants_integral_constants) {
 
         constant obj;
         constexpr std::size_t value = obj;
-        UT_CHECK_EQUAL(value, 12);
-        UT_CHECK_EQUAL(obj(), 12);
+        UT_CHECK_EQUAL(value, 12U);
+        UT_CHECK_EQUAL(obj(), 12U);
     }
 
     {
