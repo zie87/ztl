@@ -4,7 +4,7 @@
  * Distributed under the Boost Software License, Version 1.0.
  * (See accompanying file LICENSE.md or copy at http://boost.org/LICENSE_1_0.txt)
  *
-*/
+ */
 
 #ifndef ZTL_META_TYPE_TRAIT_IS_INTEGRAL_HPP
 #define ZTL_META_TYPE_TRAIT_IS_INTEGRAL_HPP
