@@ -9,6 +9,7 @@ unit_tests_srcs = [
     'meta/type_trait/is_same_test.cpp',
     'meta/type_trait/is_union_test.cpp',
     'meta/type_trait/remove_cv_test.cpp',
+    'meta/type_trait/remove_reference_test.cpp',
     'meta/utility/index_sequence_test.cpp',
     'meta/utility/integer_sequence_test.cpp',
     'numeric/ratio_test.cpp',
