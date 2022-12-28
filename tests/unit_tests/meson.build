@@ -5,6 +5,7 @@ unit_tests_srcs = [
     'meta/sequence/push_front_test.cpp',
     'meta/type_trait/is_base_of_test.cpp',
     'meta/type_trait/is_class_test.cpp',
+    'meta/type_trait/is_constructible_test.cpp',
     'meta/type_trait/is_integral_test.cpp',
     'meta/type_trait/is_reference_test.cpp',
     'meta/type_trait/is_same_test.cpp',
