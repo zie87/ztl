@@ -20,6 +20,7 @@ unit_tests_srcs = [
     'utility/endian/byteswap_test.cpp',
     'utility/endian/endian_swap_test.cpp',
     'utility/forward_test.cpp',
+    'utility/move_test.cpp',
     'utility/source_location_test.cpp',
     'main.cpp',
 ]
