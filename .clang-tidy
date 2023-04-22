@@ -1,0 +1,19 @@
+---
+Checks: >
+    -*,
+    bugprone-*,
+    cert-*
+    cppcoreguidelines-*,
+    hicpp-*,
+    llvm-*,
+    misc-*,
+    modernize-*,
+    performance-*,
+    portability-*,
+    readability-*,
+WarningsAsErrors:   '-*'
+HeaderFilterRegex:  '^((?!/build/|/subprojects/)).)*$'
+FormatStyle:        file
+
+
+
