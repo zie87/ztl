@@ -1,0 +1,13 @@
+/subprojects/*
+!/subprojects/*.wrap
+!/subprojects/packagefiles
+
+build/
+compile_commands.json
+
+__pycache__/
+*.py[cod]
+*$py.class
+
+sold.tar.gz
+sold.bundle
