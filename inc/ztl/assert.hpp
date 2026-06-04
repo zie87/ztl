@@ -1,82 +1,21 @@
-// SPDX-License-Identifier: BSL-1.0
-//
-// Copyright (c) 2026 Tobias Zindl
-//
-// Distributed under the Boost Software License, Version 1.0.
-// (See accompanying LICENSE file or copy at
-// http://www.boost.org/LICENSE_1_0.txt)
-
 #ifndef ZTL_ASSERT_HPP
 #define ZTL_ASSERT_HPP
 
 #include "ztl/source_location.hpp"
 
-#include <cstdio>
 #include <type_traits>
 #include <utility>
 
 namespace ztl
 {
-// NOTE: based on https://www.foonathan.net/2016/09/assertions/
+// NOTE: assertion implementation inspiered by https://www.foonathan.net/2016/09/assertions/
 namespace details
 {
 template<unsigned LVL_V>
 using level = std::integral_constant<unsigned, LVL_V>;
-
-// Level 1, with level, enabled
-template<typename Expr, typename Handler, unsigned Level, typename... Args>
-constexpr auto do_assert(const Expr&            expr,
-                         const source_location& loc,
-                         const char*            expression,
-                         Handler,
-                         level<Level>,
-                         Args&&... args) noexcept ->
-    typename std::enable_if<Level <= Handler::level>::type
-{
-    static_assert(Level > 0, "level of an assertion must not be 0");
-    if (!expr())
-    {
-        Handler::handle(loc, expression, std::forward<Args>(args)...);
-    }
-}
-
-// overload 1, with level, disabled
-template<typename Expr, typename Handler, unsigned Level, typename... Args>
-constexpr auto do_assert(const Expr&,
-                         const source_location&,
-                         const char*,
-                         Handler,
-                         level<Level>,
-                         Args&&...) noexcept ->
-    typename std::enable_if<(Level > Handler::level)>::type
-{
-}
-
-// overload 2, without level, enabled
-template<typename Expr, typename Handler, typename... Args>
-constexpr auto do_assert(const Expr&            expr,
-                         const source_location& loc,
-                         const char*            expression,
-                         Handler,
-                         Args&&... args) noexcept ->
-    typename std::enable_if<Handler::level != 0>::type
-{
-    if (!expr())
-    {
-        Handler::handle(loc, expression, std::forward<Args>(args)...);
-    }
-}
-
-// overload 2, without level, disabled
-template<typename Expr, typename Handler, typename... Args>
-constexpr auto
-do_assert(const Expr&, const source_location&, const char*, Handler, Args&&...) noexcept ->
-    typename std::enable_if<Handler::level == 0>::type
-{
-}
 } // namespace details
 
-[[noreturn]] inline constexpr void trap_forever() noexcept
+[[noreturn]] inline void trap_forever() noexcept
 {
 #if defined(__GNUC__) || defined(__clang__)
     __builtin_trap();
@@ -89,25 +28,70 @@ do_assert(const Expr&, const source_location&, const char*, Handler, Args&&...) 
 
 struct default_assert_handler
 {
-    static constexpr unsigned level = 1;
+    static constexpr unsigned level = 1U;
 
-    [[noreturn]] static constexpr void handle([[maybe_unused]] const source_location& loc,
-                                              [[maybe_unused]] const char*            expression,
-                                              [[maybe_unused]] const char*            message
-                                              = nullptr) noexcept
+    [[noreturn]] static void handle(const source_location& loc,
+                                    const char*            expression,
+                                    const char*            message = nullptr) noexcept
     {
+        (void)loc;
+        (void)expression;
+        (void)message;
         trap_forever();
     }
 };
 
+namespace details
+{
+template<typename Handler, typename... Args>
+constexpr bool assert_is_enabled(Handler, Args&&...) noexcept
+{
+    return Handler::level != 0U;
+}
+
+template<typename Handler, unsigned Level, typename... Args>
+constexpr bool assert_is_enabled(Handler, level<Level>, Args&&...) noexcept
+{
+    static_assert(Level > 0U, "level of an assertion must not be 0");
+    return Level <= Handler::level;
+}
+
+template<typename Handler, typename... Args>
+[[noreturn]] inline void
+assert_fail(const source_location& loc, const char* expression, Handler, Args&&... args) noexcept
+{
+    Handler::handle(loc, expression, std::forward<Args>(args)...);
+    trap_forever();
+}
+
+template<typename Handler, unsigned Level, typename... Args>
+[[noreturn]] inline void assert_fail(const source_location& loc,
+                                     const char*            expression,
+                                     Handler,
+                                     level<Level>,
+                                     Args&&... args) noexcept
+{
+    static_assert(Level > 0U, "level of an assertion must not be 0");
+    Handler::handle(loc, expression, std::forward<Args>(args)...);
+    trap_forever();
+}
+} // namespace details
 } // namespace ztl
 
 #define ZTL_ASSERT(cond, ...)                                                                      \
-    ::ztl::details::do_assert([&] { return cond; }, ZTL_CURRENT_SOURCE_LOCATION, #cond, __VA_ARGS__)
+    do                                                                                             \
+    {                                                                                              \
+        if (::ztl::details::assert_is_enabled(__VA_ARGS__))                                        \
+        {                                                                                          \
+            if (!(cond))                                                                           \
+            {                                                                                      \
+                ::ztl::details::assert_fail(ZTL_CURRENT_SOURCE_LOCATION, #cond, __VA_ARGS__);      \
+            }                                                                                      \
+        }                                                                                          \
+    } while (false)
 
-#define ZTL_CONTRACT_CHECK(type, cond) ZTL_ASSERT(cond, ztl::default_assert_handler{}, type);
-
+#define ZTL_CONTRACT_CHECK(type, cond) ZTL_ASSERT((cond), ::ztl::default_assert_handler{}, type)
 #define ZTL_EXPECTS(cond) ZTL_CONTRACT_CHECK("Precondition", cond)
 #define ZTL_ENSURES(cond) ZTL_CONTRACT_CHECK("Postcondition", cond)
 
-#endif // ZTL_ASSERT_HPP
+#endif
