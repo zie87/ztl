@@ -10,6 +10,7 @@ ztl_test_exe = executable(
         'ztl/hash_tests.cpp',
         'ztl/serialize_tests.cpp',
         'ztl/span_tests.cpp',
+        'ztl/utility_tests.cpp',
     ),
     dependencies: [ztl_dep, doctest_dep],
 )

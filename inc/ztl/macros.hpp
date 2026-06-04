@@ -36,4 +36,16 @@ constexpr const char* file_basename(const char* path) noexcept
 #define ZTL_FUNC __func__
 #define ZTL_FILE_BASENAME (::ztl::details::file_basename(ZTL_FILE))
 
+#ifndef ZTL_NODISCARD
+#if defined(__has_cpp_attribute)
+#if __has_cpp_attribute(nodiscard) >= 201603
+#define ZTL_NODISCARD [[nodiscard]]
+#else
+#define ZTL_NODISCARD
+#endif
+#else
+#define ZTL_NODISCARD
+#endif
+#endif
+
 #endif /* ZTL_MACROS_HPP */
