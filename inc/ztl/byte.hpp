@@ -53,6 +53,11 @@ constexpr T to_integer(byte b) noexcept
     return static_cast<T>(b);
 }
 
+static inline constexpr auto to_byte(std::uint8_t value) noexcept -> byte
+{
+    return static_cast<ztl::byte>(value);
+}
+
 template<typename T, std::enable_if_t<std::is_integral<T>::value, bool> = true>
 constexpr byte operator<<(byte b, T shift) noexcept
 {

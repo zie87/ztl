@@ -5,6 +5,7 @@ ztl_test_exe = executable(
     files(
         'doctest_main.cpp',
         'ztl/byte_tests.cpp',
+        'ztl/cobs_tests.cpp',
         'ztl/crc_tests.cpp',
         'ztl/endian_tests.cpp',
         'ztl/hash_tests.cpp',
