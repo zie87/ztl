@@ -13,7 +13,11 @@
 
 namespace ztl
 {
-  
+
+// NOTE: backport of C++17
+template<bool B>
+using bool_constant = std::integral_constant<bool, B>;
+
 // NOTE: backport of C++17
 template<typename...>
 using void_t = void;

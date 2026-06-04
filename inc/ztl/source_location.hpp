@@ -51,7 +51,7 @@ inline constexpr const char* source_location::function_name() const noexcept
 }
 } // namespace ztl
 
-#define CURRENT_SOURCE_LOCATION                                                                    \
+#define ZTL_CURRENT_SOURCE_LOCATION                                                                \
     ::ztl::source_location::current(ZTL_FILE_BASENAME, ZTL_LINE, ZTL_FUNC)
 
 #endif // ZTL_SOURCELOCATION_HPP
