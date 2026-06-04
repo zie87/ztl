@@ -638,6 +638,18 @@ struct calculate_byte_size<T, dynamic_extent> : std::integral_constant<std::size
 };
 } // namespace details
 
+template<typename T, std::size_t N>
+inline constexpr auto size(span<T, N>) noexcept -> std::size_t
+{
+    return N;
+}
+
+template<typename T>
+inline constexpr auto size(span<T, dynamic_extent> s) noexcept -> std::size_t
+{
+    return s.size();
+}
+
 template<class T, std::size_t EXTENT_V>
 inline span<const ztl::byte, details::calculate_byte_size<T, EXTENT_V>::value>
 as_bytes(span<T, EXTENT_V> s) noexcept
