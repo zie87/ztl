@@ -8,6 +8,7 @@ ztl_test_exe = executable(
         'ztl/cobs_tests.cpp',
         'ztl/crc_tests.cpp',
         'ztl/endian_tests.cpp',
+        'ztl/functional/function_ref_tests.cpp',
         'ztl/hash_tests.cpp',
         'ztl/serialize_tests.cpp',
         'ztl/span_tests.cpp',

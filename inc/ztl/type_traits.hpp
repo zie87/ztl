@@ -20,7 +20,13 @@ using bool_constant = std::integral_constant<bool, B>;
 
 // NOTE: backport of C++17
 template<typename...>
-using void_t = void;
+struct make_void
+{
+    using type = void;
+};
+
+template<typename... T>
+using void_t = typename make_void<T...>::type;
 
 // NOTE: backport of C++20
 template<class T>
@@ -35,5 +41,7 @@ struct remove_cvref
 template<class T>
 using remove_cvref_t = typename remove_cvref<T>::type;
 } // namespace ztl
+
+#include "ztl/type_traits/is_invocable.hpp"
 
 #endif // ZTL_TYPETRAITS_HPP

@@ -48,4 +48,12 @@ constexpr const char* file_basename(const char* path) noexcept
 #endif
 #endif
 
+#ifndef ZTL_FUNCTION_REF_HAS_NOEXCEPT_FUNCTION_TYPE
+#if defined(__cpp_noexcept_function_type) && (__cpp_noexcept_function_type >= 201510)
+#define ZTL_FUNCTION_REF_HAS_NOEXCEPT_FUNCTION_TYPE 1
+#else
+#define ZTL_FUNCTION_REF_HAS_NOEXCEPT_FUNCTION_TYPE 0
+#endif
+#endif
+
 #endif /* ZTL_MACROS_HPP */
