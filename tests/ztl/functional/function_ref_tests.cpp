@@ -62,12 +62,9 @@ struct lvalue_only_callable
 
 struct noncopyable_callable
 {
-    explicit noncopyable_callable(int& counter) noexcept
-        : counter_ptr(&counter)
-    {
-    }
+    explicit noncopyable_callable(int& counter) noexcept : counter_ptr(&counter) {}
 
-    noncopyable_callable(const noncopyable_callable&) = delete;
+    noncopyable_callable(const noncopyable_callable&)            = delete;
     noncopyable_callable& operator=(const noncopyable_callable&) = delete;
 
     int operator()(int value) noexcept
@@ -84,7 +81,7 @@ struct incompatible_callable
     int operator()(const char*) noexcept { return 0; }
 };
 
-using int_no_args_function_pointer = int (*)();
+using int_no_args_function_pointer  = int (*)();
 using int_data_arg_function_pointer = int (*)(data*);
 
 int_no_args_function_pointer get_free_function_no_args_pointer() noexcept
@@ -111,8 +108,7 @@ void disturb_stack() noexcept
 
 struct stored_no_args_callback
 {
-    explicit stored_no_args_callback(ztl::function_ref<int()> callback) noexcept
-        : action(callback)
+    explicit stored_no_args_callback(ztl::function_ref<int()> callback) noexcept : action(callback)
     {
     }
 
@@ -122,7 +118,7 @@ struct stored_no_args_callback
 struct stored_data_callback
 {
     explicit stored_data_callback(ztl::function_ref<int(data*)> callback) noexcept
-        : action(callback)
+    : action(callback)
     {
     }
 
@@ -145,7 +141,7 @@ struct is_bool_testable : std::false_type
 
 template<typename T>
 struct is_bool_testable<T, void_t<decltype(static_cast<bool>(std::declval<T const&>()))>>
-    : std::true_type
+: std::true_type
 {
 };
 
@@ -155,8 +151,7 @@ struct has_nullptr_equal : std::false_type
 };
 
 template<typename T>
-struct has_nullptr_equal<T, void_t<decltype(std::declval<T const&>() == nullptr)>>
-    : std::true_type
+struct has_nullptr_equal<T, void_t<decltype(std::declval<T const&>() == nullptr)>> : std::true_type
 {
 };
 
@@ -167,7 +162,7 @@ struct has_nullptr_not_equal : std::false_type
 
 template<typename T>
 struct has_nullptr_not_equal<T, void_t<decltype(std::declval<T const&>() != nullptr)>>
-    : std::true_type
+: std::true_type
 {
 };
 
@@ -177,8 +172,7 @@ struct has_target_type : std::false_type
 };
 
 template<typename T>
-struct has_target_type<T, void_t<decltype(std::declval<T const&>().target_type())>>
-    : std::true_type
+struct has_target_type<T, void_t<decltype(std::declval<T const&>().target_type())>> : std::true_type
 {
 };
 
@@ -189,7 +183,7 @@ struct has_target : std::false_type
 
 template<typename T>
 struct has_target<T, void_t<decltype(std::declval<T&>().template target<int (*)()>())>>
-    : std::true_type
+: std::true_type
 {
 };
 
@@ -216,9 +210,11 @@ TEST_CASE("function_ref has non-owning value semantics")
                   "temporary callable objects must not be accepted");
     static_assert(!std::is_assignable<ztl::function_ref<void()>&, lvalue_only_callable&>::value,
                   "rebinding from arbitrary callable assignment should stay deleted");
-    static_assert(std::is_assignable<ztl::function_ref<int()>&, int_no_args_function_pointer>::value,
-                  "rebinding through function pointers should remain possible");
-    static_assert(std::is_nothrow_constructible<ztl::function_ref<int()>, int_no_args_function_pointer>::value,
+    static_assert(
+        std::is_assignable<ztl::function_ref<int()>&, int_no_args_function_pointer>::value,
+        "rebinding through function pointers should remain possible");
+    static_assert(std::is_nothrow_constructible<ztl::function_ref<int()>,
+                                                int_no_args_function_pointer>::value,
                   "construction from a function pointer should be noexcept");
     static_assert(std::is_nothrow_constructible<ztl::function_ref<void(bool)>, functor&>::value,
                   "construction from a callable reference should be noexcept");
@@ -238,33 +234,33 @@ TEST_CASE("function_ref omits std::function-style nullable and target APIs")
                   "function_ref should not compare unequal to nullptr");
     static_assert(!has_target_type<ref_type>::value,
                   "function_ref should not expose target_type()");
-    static_assert(!has_target<ref_type>::value,
-                  "function_ref should not expose target<T>()");
+    static_assert(!has_target<ref_type>::value, "function_ref should not expose target<T>()");
 }
 
 TEST_CASE("function_ref rejects non-callable and incompatible targets")
 {
     static_assert(!std::is_constructible<ztl::function_ref<int(int)>, data&>::value,
                   "non-callable object references should not bind");
-    static_assert(!std::is_constructible<ztl::function_ref<int(int)>, incompatible_callable&>::value,
-                  "wrong call signatures should not bind");
+    static_assert(
+        !std::is_constructible<ztl::function_ref<int(int)>, incompatible_callable&>::value,
+        "wrong call signatures should not bind");
 }
 
 TEST_CASE("function_ref rejects direct pointer-to-member construction")
 {
-    using member_function_pointer = bool (member_test_class::*)(int);
+    using member_function_pointer       = bool (member_test_class::*)(int);
     using const_member_function_pointer = char (member_test_class::*)(bool) const;
-    using member_object_pointer = int data::*;
+    using member_object_pointer         = int data::*;
 
     static_assert(!std::is_constructible<ztl::function_ref<bool(member_test_class&, int)>,
-                                        member_function_pointer>::value,
+                                         member_function_pointer>::value,
                   "P0792R14 Behavior B.2 rejects direct pointer-to-member functions");
     static_assert(!std::is_constructible<ztl::function_ref<char(member_test_class const&, bool)>,
-                                        const_member_function_pointer>::value,
+                                         const_member_function_pointer>::value,
                   "P0792R14 Behavior B.2 rejects direct const pointer-to-member functions");
-    static_assert(!std::is_constructible<ztl::function_ref<int&(data&)>,
-                                        member_object_pointer>::value,
-                  "P0792R14 Behavior B.2 rejects direct pointer-to-member objects");
+    static_assert(
+        !std::is_constructible<ztl::function_ref<int&(data&)>, member_object_pointer>::value,
+        "P0792R14 Behavior B.2 rejects direct pointer-to-member objects");
 }
 
 TEST_CASE("function_ref binds lambdas")
@@ -316,7 +312,7 @@ TEST_CASE("function_ref binds function objects")
 
     SUBCASE("non-copyable callable lvalue")
     {
-        int                  calls  = 0;
+        int                  calls = 0;
         noncopyable_callable object(calls);
 
         ztl::function_ref<int(int)> func_ref(object);
