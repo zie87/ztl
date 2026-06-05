@@ -9,6 +9,7 @@
 #ifndef ZTL_SPAN_HPP
 #define ZTL_SPAN_HPP
 
+#include "ztl/iterator_interface.hpp"
 #include "ztl/type_traits.hpp"
 #include "ztl/memory.hpp"
 #include "ztl/assert.hpp"
@@ -34,188 +35,195 @@ class span;
 
 namespace details
 {
-template<typename T>
-struct span_iterator
+template<typename T, typename U>
+struct is_span_iterator_interoperable
+: std::integral_constant<
+      bool,
+      std::is_same<typename std::remove_cv<T>::type, typename std::remove_cv<U>::type>::value>
 {
-    using iterator_category = std::random_access_iterator_tag;
-    using value_type        = ztl::remove_cv_t<T>;
-    using difference_type   = std::ptrdiff_t;
-    using pointer           = T*;
-    using reference         = T&;
+};
 
-    constexpr span_iterator() = default;
+template<typename T>
+struct span_iterator : ztl::iterator_interface<span_iterator<T>, std::random_access_iterator_tag, T>
+{
+    template<typename>
+    friend struct span_iterator;
 
-    constexpr span_iterator(pointer begin, pointer end, pointer current)
-    : m_begin(begin), m_end(end), m_current(current)
+    using base = ztl::iterator_interface<span_iterator<T>, std::random_access_iterator_tag, T>;
+    using difference_type = typename base::difference_type;
+    using reference       = typename base::reference;
+
+    constexpr span_iterator() noexcept = default;
+
+    constexpr span_iterator(T* begin, T* end, T* current) noexcept
+    : m_current(current), m_begin(begin), m_end(end)
     {
-        ZTL_EXPECTS(begin != nullptr);
-        ZTL_EXPECTS(end != nullptr);
-        ZTL_EXPECTS(current != nullptr);
-        ZTL_EXPECTS(m_begin <= m_current && current <= m_end);
+        if (begin == end)
+        {
+            ZTL_EXPECTS(current == begin);
+        }
+        else
+        {
+            ZTL_EXPECTS(begin != nullptr);
+            ZTL_EXPECTS(end != nullptr);
+            ZTL_EXPECTS(current != nullptr);
+            ZTL_EXPECTS(begin <= current && current <= end);
+        }
     }
 
+    template<
+        typename U,
+        typename std::enable_if<!std::is_same<T, U>::value && std::is_convertible<U*, T*>::value,
+                                int>::type
+        = 0>
+    constexpr span_iterator(const span_iterator<U>& other) noexcept
+    : m_current(other.m_current), m_begin(other.m_begin), m_end(other.m_end)
+    {
+    }
+
+    // Required primitives for ztl::iterator_interface random-access support.
+    // The interface synthesizes ++, --, -=, +, iterator - difference, and []
+    // from these operations.  The cv-interoperable comparisons below cover
+    // span_iterator<T> <-> span_iterator<const T>.
     constexpr reference operator*() const noexcept
     {
         ZTL_EXPECTS(m_current != m_end);
         return *m_current;
     }
 
-    constexpr pointer operator->() const noexcept
+    constexpr span_iterator& operator+=(difference_type n) noexcept
     {
-        ZTL_EXPECTS(m_current != m_end);
-        return m_current;
-    }
-    constexpr span_iterator& operator++() noexcept
-    {
-        ZTL_EXPECTS(m_current != m_end);
+        if (n == difference_type(0))
+        {
+            return *this;
+        }
 
-        ++m_current;
-        return *this;
-    }
-
-    constexpr span_iterator operator++(int) noexcept
-    {
-        span_iterator ret = *this;
-        ++*this;
-        return ret;
-    }
-
-    constexpr span_iterator& operator--() noexcept
-    {
-        ZTL_EXPECTS(m_begin != m_current);
-        --m_current;
-        return *this;
-    }
-
-    constexpr span_iterator operator--(int) noexcept
-    {
-        span_iterator ret = *this;
-        --*this;
-        return ret;
-    }
-
-    constexpr span_iterator& operator+=(const difference_type n) noexcept
-    {
         ZTL_EXPECTS(m_begin != nullptr);
         ZTL_EXPECTS(m_end != nullptr);
         ZTL_EXPECTS(m_current != nullptr);
 
-        if (n != 0)
+        if (n > difference_type(0))
         {
-            ZTL_EXPECTS(m_begin && m_current && m_end);
+            ZTL_EXPECTS(n <= m_end - m_current);
         }
-        if (n > 0)
+        else
         {
-            ZTL_EXPECTS(m_end - m_current >= n);
+            ZTL_EXPECTS(n >= m_begin - m_current);
         }
-        if (n < 0)
-        {
-            ZTL_EXPECTS(m_current - m_begin >= -n);
-        }
+
         m_current += n;
         return *this;
     }
 
-    constexpr span_iterator operator+(const difference_type n) const noexcept
+    constexpr difference_type operator-(const span_iterator& rhs) const noexcept
     {
-        span_iterator ret = *this;
-        ret += n;
-        return ret;
+        return subtract(rhs);
     }
 
-    friend constexpr span_iterator operator+(const difference_type n,
-                                             const span_iterator&  rhs) noexcept
-    {
-        return rhs + n;
-    }
+    constexpr bool operator==(const span_iterator& rhs) const noexcept { return equal(rhs); }
 
-    constexpr span_iterator& operator-=(const difference_type n) noexcept
-    {
-        ZTL_EXPECTS(m_begin && m_current && m_end);
+    template<typename L, typename R>
+    friend constexpr typename std::enable_if<is_span_iterator_interoperable<L, R>::value
+                                                 && !std::is_same<L, R>::value,
+                                             typename span_iterator<L>::difference_type>::type
+    operator-(const span_iterator<L>& lhs, const span_iterator<R>& rhs) noexcept;
 
-        if (n > 0)
-        {
-            ZTL_EXPECTS(m_current - m_begin >= n);
-        }
-        if (n < 0)
-        {
-            ZTL_EXPECTS(m_end - m_current >= -n);
-        }
-        m_current -= n;
-        return *this;
-    }
+    template<typename L, typename R>
+    friend constexpr typename std::enable_if<is_span_iterator_interoperable<L, R>::value
+                                                 && !std::is_same<L, R>::value,
+                                             bool>::type
+    operator==(const span_iterator<L>& lhs, const span_iterator<R>& rhs) noexcept;
 
-    constexpr span_iterator operator-(const difference_type n) const noexcept
-    {
-        span_iterator ret = *this;
-        ret -= n;
-        return ret;
-    }
-
-    template<class OTHER_T,
-             std::enable_if_t<std::is_same<std::remove_cv_t<OTHER_T>, value_type>::value, int> = 0>
-    constexpr difference_type operator-(const span_iterator<OTHER_T>& rhs) const noexcept
+private:
+    template<typename U>
+    constexpr difference_type subtract(const span_iterator<U>& rhs) const noexcept
     {
         ZTL_EXPECTS(m_begin == rhs.m_begin && m_end == rhs.m_end);
-        ZTL_EXPECTS(m_current != nullptr);
-        ZTL_EXPECTS(rhs.m_current != nullptr);
+
+        if (m_current == rhs.m_current)
+        {
+            return difference_type(0);
+        }
+
         return m_current - rhs.m_current;
     }
 
-    constexpr reference operator[](const difference_type n) const noexcept { return *(*this + n); }
-
-    template<class OTHER_T,
-             std::enable_if_t<std::is_same<std::remove_cv_t<OTHER_T>, value_type>::value, int> = 0>
-    constexpr bool operator==(const span_iterator<OTHER_T>& rhs) const noexcept
+    template<typename U>
+    constexpr bool equal(const span_iterator<U>& rhs) const noexcept
     {
         ZTL_EXPECTS(m_begin == rhs.m_begin && m_end == rhs.m_end);
         return m_current == rhs.m_current;
     }
 
-    template<class OTHER_T,
-             std::enable_if_t<std::is_same<std::remove_cv_t<OTHER_T>, value_type>::value, int> = 0>
-    constexpr bool operator!=(const span_iterator<OTHER_T>& rhs) const noexcept
-    {
-        return !(*this == rhs);
-    }
-
-    template<class OTHER_T,
-             std::enable_if_t<std::is_same<std::remove_cv_t<OTHER_T>, value_type>::value, int> = 0>
-    constexpr bool operator<(const span_iterator<OTHER_T>& rhs) const noexcept
-    {
-        ZTL_EXPECTS(m_begin == rhs.m_begin && m_end == rhs.m_end);
-        return m_current < rhs.m_current;
-    }
-
-    template<class OTHER_T,
-             std::enable_if_t<std::is_same<std::remove_cv_t<OTHER_T>, value_type>::value, int> = 0>
-    constexpr bool operator>(const span_iterator<OTHER_T>& rhs) const noexcept
-    {
-        return rhs < *this;
-    }
-
-    template<class OTHER_T,
-             std::enable_if_t<std::is_same<std::remove_cv_t<OTHER_T>, value_type>::value, int> = 0>
-    constexpr bool operator<=(const span_iterator<OTHER_T>& rhs) const noexcept
-    {
-        return !(rhs < *this);
-    }
-
-    template<class OTHER_T,
-             std::enable_if_t<std::is_same<std::remove_cv_t<OTHER_T>, value_type>::value, int> = 0>
-    constexpr bool operator>=(const span_iterator<OTHER_T>& rhs) const noexcept
-    {
-        return !(*this < rhs);
-    }
-
-private:
-    template<typename>
-    friend struct span_iterator;
-
-    pointer m_begin{nullptr};
-    pointer m_end{nullptr};
-    pointer m_current{nullptr};
+    T* m_current{nullptr};
+    T* m_begin{nullptr};
+    T* m_end{nullptr};
 };
+
+template<typename T, typename U>
+constexpr typename std::enable_if<is_span_iterator_interoperable<T, U>::value
+                                      && !std::is_same<T, U>::value,
+                                  typename span_iterator<T>::difference_type>::type
+operator-(const span_iterator<T>& lhs, const span_iterator<U>& rhs) noexcept
+{
+    ZTL_EXPECTS(lhs.m_begin == rhs.m_begin && lhs.m_end == rhs.m_end);
+
+    if (lhs.m_current == rhs.m_current)
+    {
+        return typename span_iterator<T>::difference_type(0);
+    }
+
+    return lhs.m_current - rhs.m_current;
+}
+
+template<typename T, typename U>
+constexpr typename std::
+    enable_if<is_span_iterator_interoperable<T, U>::value && !std::is_same<T, U>::value, bool>::type
+    operator==(const span_iterator<T>& lhs, const span_iterator<U>& rhs) noexcept
+{
+    ZTL_EXPECTS(lhs.m_begin == rhs.m_begin && lhs.m_end == rhs.m_end);
+    return lhs.m_current == rhs.m_current;
+}
+
+template<typename T, typename U>
+constexpr typename std::
+    enable_if<is_span_iterator_interoperable<T, U>::value && !std::is_same<T, U>::value, bool>::type
+    operator!=(const span_iterator<T>& lhs, const span_iterator<U>& rhs) noexcept
+{
+    return !(lhs == rhs);
+}
+
+template<typename T, typename U>
+constexpr typename std::
+    enable_if<is_span_iterator_interoperable<T, U>::value && !std::is_same<T, U>::value, bool>::type
+    operator<(const span_iterator<T>& lhs, const span_iterator<U>& rhs) noexcept
+{
+    return (lhs - rhs) < typename span_iterator<T>::difference_type(0);
+}
+
+template<typename T, typename U>
+constexpr typename std::
+    enable_if<is_span_iterator_interoperable<T, U>::value && !std::is_same<T, U>::value, bool>::type
+    operator>(const span_iterator<T>& lhs, const span_iterator<U>& rhs) noexcept
+{
+    return rhs < lhs;
+}
+
+template<typename T, typename U>
+constexpr typename std::
+    enable_if<is_span_iterator_interoperable<T, U>::value && !std::is_same<T, U>::value, bool>::type
+    operator<=(const span_iterator<T>& lhs, const span_iterator<U>& rhs) noexcept
+{
+    return !(rhs < lhs);
+}
+
+template<typename T, typename U>
+constexpr typename std::
+    enable_if<is_span_iterator_interoperable<T, U>::value && !std::is_same<T, U>::value, bool>::type
+    operator>=(const span_iterator<T>& lhs, const span_iterator<U>& rhs) noexcept
+{
+    return !(lhs < rhs);
+}
 
 template<std::size_t EXTENT_V>
 struct extent_type
