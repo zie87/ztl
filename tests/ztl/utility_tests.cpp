@@ -5,19 +5,16 @@
 #include <type_traits>
 #include <utility>
 
-namespace
-{
+namespace {
 
-struct count_action
-{
+struct count_action {
     int* count = nullptr;
 
     explicit count_action(int& c) noexcept : count(&c) {}
     void operator()() noexcept { ++(*count); }
 };
 
-struct move_only_action
-{
+struct move_only_action {
     int* count = nullptr;
 
     explicit move_only_action(int& c) noexcept : count(&c) {}
@@ -25,31 +22,24 @@ struct move_only_action
     move_only_action(const move_only_action&)            = delete;
     move_only_action& operator=(const move_only_action&) = delete;
 
-    move_only_action(move_only_action&& other) noexcept : count(other.count)
-    {
-        other.count = nullptr;
-    }
+    move_only_action(move_only_action&& other) noexcept : count(other.count) { other.count = nullptr; }
 
     move_only_action& operator=(move_only_action&&) = delete;
 
-    void operator()() noexcept
-    {
-        if (count != nullptr)
-        {
+    void operator()() noexcept {
+        if (count != nullptr) {
             ++(*count);
         }
     }
 };
 
-struct mutable_action
-{
+struct mutable_action {
     int* count       = nullptr;
     int  local_count = 0;
 
     explicit mutable_action(int& c) noexcept : count(&c), local_count(0) {}
 
-    void operator()() noexcept
-    {
+    void operator()() noexcept {
         ++local_count;
         *count += local_count;
     }
@@ -57,38 +47,30 @@ struct mutable_action
 
 } // namespace
 
-TEST_CASE("ztl::final_action type traits")
-{
+TEST_CASE("ztl::final_action type traits") {
     typedef ztl::final_action<count_action> guard_type;
 
-    static_assert(!std::is_copy_constructible<guard_type>::value,
-                  "final_action must not be copy constructible");
+    static_assert(!std::is_copy_constructible<guard_type>::value, "final_action must not be copy constructible");
 
-    static_assert(!std::is_copy_assignable<guard_type>::value,
-                  "final_action must not be copy assignable");
+    static_assert(!std::is_copy_assignable<guard_type>::value, "final_action must not be copy assignable");
 
-    static_assert(std::is_move_constructible<guard_type>::value,
-                  "final_action must be move constructible");
+    static_assert(std::is_move_constructible<guard_type>::value, "final_action must be move constructible");
 
-    static_assert(!std::is_move_assignable<guard_type>::value,
-                  "final_action must not be move assignable");
+    static_assert(!std::is_move_assignable<guard_type>::value, "final_action must not be move assignable");
 
-    static_assert(std::is_nothrow_destructible<guard_type>::value,
-                  "final_action destructor must be noexcept");
+    static_assert(std::is_nothrow_destructible<guard_type>::value, "final_action destructor must be noexcept");
 
     CHECK(true);
 }
 
-TEST_CASE("ztl::finally returns a decayed final_action")
-{
+TEST_CASE("ztl::finally returns a decayed final_action") {
     typedef decltype(ztl::finally(std::declval<count_action&>())) result_type;
     static_assert(std::is_same<result_type, ztl::final_action<count_action>>::value,
                   "finally must decay the callable type");
     CHECK(true);
 }
 
-TEST_CASE("ztl::final_action invokes callable when destroyed")
-{
+TEST_CASE("ztl::final_action invokes callable when destroyed") {
     int count = 0;
     {
         ztl::final_action<count_action> guard{count_action{count}};
@@ -97,8 +79,7 @@ TEST_CASE("ztl::final_action invokes callable when destroyed")
     CHECK(count == 1);
 }
 
-TEST_CASE("ztl::final_action can be constructed from lvalue callable")
-{
+TEST_CASE("ztl::final_action can be constructed from lvalue callable") {
     int          count = 0;
     count_action action{count};
     {
@@ -108,8 +89,7 @@ TEST_CASE("ztl::final_action can be constructed from lvalue callable")
     CHECK(count == 1);
 }
 
-TEST_CASE("ztl::finally invokes callable at scope exit")
-{
+TEST_CASE("ztl::finally invokes callable at scope exit") {
     int count = 0;
     {
         auto guard = ztl::finally([&count]() noexcept { ++count; });
@@ -118,8 +98,7 @@ TEST_CASE("ztl::finally invokes callable at scope exit")
     CHECK(count == 1);
 }
 
-TEST_CASE("ztl::finally supports mutable callable")
-{
+TEST_CASE("ztl::finally supports mutable callable") {
     int count = 0;
     {
         auto guard = ztl::finally(mutable_action{count});
@@ -128,8 +107,7 @@ TEST_CASE("ztl::finally supports mutable callable")
     CHECK(count == 1);
 }
 
-TEST_CASE("ztl::finally supports move-only callable")
-{
+TEST_CASE("ztl::finally supports move-only callable") {
     int count = 0;
     {
         auto guard = ztl::finally(move_only_action{count});
@@ -138,8 +116,7 @@ TEST_CASE("ztl::finally supports move-only callable")
     CHECK(count == 1);
 }
 
-TEST_CASE("ztl::final_action move construction transfers ownership")
-{
+TEST_CASE("ztl::final_action move construction transfers ownership") {
     int count = 0;
     {
         auto guard1 = ztl::finally([&count]() noexcept { ++count; });
@@ -153,8 +130,7 @@ TEST_CASE("ztl::final_action move construction transfers ownership")
     CHECK(count == 1);
 }
 
-TEST_CASE("ztl::final_action moved-from object does not invoke callable")
-{
+TEST_CASE("ztl::final_action moved-from object does not invoke callable") {
     int count = 0;
     {
         auto guard1 = ztl::finally([&count]() noexcept { ++count; });
@@ -164,8 +140,7 @@ TEST_CASE("ztl::final_action moved-from object does not invoke callable")
     CHECK(count == 1);
 }
 
-TEST_CASE("ztl::final_action can be moved multiple times and still invokes once")
-{
+TEST_CASE("ztl::final_action can be moved multiple times and still invokes once") {
     int count = 0;
     {
         auto guard1 = ztl::finally([&count]() noexcept { ++count; });
@@ -176,8 +151,7 @@ TEST_CASE("ztl::final_action can be moved multiple times and still invokes once"
     CHECK(count == 1);
 }
 
-TEST_CASE("ztl::final_action executes guards in reverse construction order")
-{
+TEST_CASE("ztl::final_action executes guards in reverse construction order") {
     int value = 0;
     {
         auto first  = ztl::finally([&value]() noexcept { value = value * 10 + 1; });
@@ -188,8 +162,7 @@ TEST_CASE("ztl::final_action executes guards in reverse construction order")
     CHECK(value == 21);
 }
 
-TEST_CASE("ztl::final_action works with pointer cleanup style use case")
-{
+TEST_CASE("ztl::final_action works with pointer cleanup style use case") {
     bool resource_acquired = true;
     {
         auto cleanup = ztl::finally([&resource_acquired]() noexcept { resource_acquired = false; });

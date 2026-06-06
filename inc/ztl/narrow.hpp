@@ -11,18 +11,15 @@
 
 #include <utility>
 
-namespace ztl
-{
+namespace ztl {
 
-template<class T, class U>
-constexpr T narrow_cast(U&& u) noexcept
-{
+template <class T, class U>
+constexpr T narrow_cast(U&& u) noexcept {
     return static_cast<T>(std::forward<U>(u));
 }
 
-template<class T>
-constexpr typename std::underlying_type<T>::type to_underlying(T e) noexcept
-{
+template <class T>
+constexpr typename std::underlying_type<T>::type to_underlying(T e) noexcept {
     using type = typename std::underlying_type<T>::type;
     return static_cast<type>(e);
 }

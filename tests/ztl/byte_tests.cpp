@@ -6,11 +6,9 @@
 #include <cstdint>
 #include <type_traits>
 
-namespace
-{
+namespace {
 
-constexpr ztl::byte make_byte(unsigned value) noexcept
-{
+constexpr ztl::byte make_byte(unsigned value) noexcept {
     return static_cast<ztl::byte>(static_cast<std::uint8_t>(value));
 }
 
@@ -55,8 +53,7 @@ struct has_right_shift<B, Shift, ztl::void_t<decltype(std::declval<B>() >> std::
 
 } // namespace
 
-TEST_CASE("ztl::byte exposes byte-like type traits")
-{
+TEST_CASE("ztl::byte exposes byte-like type traits") {
     CHECK(std::is_enum<ztl::byte>::value);
     CHECK(std::is_trivially_copyable<ztl::byte>::value);
     CHECK(std::is_standard_layout<ztl::byte>::value);
@@ -66,21 +63,18 @@ TEST_CASE("ztl::byte exposes byte-like type traits")
     CHECK_FALSE((std::is_convertible<int, ztl::byte>::value));
 }
 
-TEST_CASE("ztl::byte converts explicitly to integral values")
-{
+TEST_CASE("ztl::byte converts explicitly to integral values") {
     constexpr auto b = make_byte(0xa5u);
 
     static_assert(ztl::to_integer<std::uint8_t>(b) == 0xa5u, "to_integer must be constexpr");
-    static_assert(ztl::to_integer<unsigned>(b) == 0xa5u,
-                  "to_integer must support integral targets");
+    static_assert(ztl::to_integer<unsigned>(b) == 0xa5u, "to_integer must support integral targets");
 
     CHECK(ztl::to_integer<std::uint8_t>(b) == 0xa5u);
     CHECK(ztl::to_integer<unsigned>(b) == 0xa5u);
     CHECK(ztl::to_integer<int>(b) == 0xa5);
 }
 
-TEST_CASE("ztl::byte supports bitwise operators")
-{
+TEST_CASE("ztl::byte supports bitwise operators") {
     const auto lhs = make_byte(0xacu);
     const auto rhs = make_byte(0x53u);
 
@@ -90,8 +84,7 @@ TEST_CASE("ztl::byte supports bitwise operators")
     CHECK(ztl::to_integer<unsigned>(~make_byte(0x0fu)) == 0xf0u);
 }
 
-TEST_CASE("ztl::byte supports compound bitwise assignment operators")
-{
+TEST_CASE("ztl::byte supports compound bitwise assignment operators") {
     auto value = make_byte(0x0fu);
     value |= make_byte(0xf0u);
     CHECK(ztl::to_integer<unsigned>(value) == 0xffu);
@@ -103,8 +96,7 @@ TEST_CASE("ztl::byte supports compound bitwise assignment operators")
     CHECK(ztl::to_integer<unsigned>(value) == 0x3cu);
 }
 
-TEST_CASE("ztl::byte supports integral shifts")
-{
+TEST_CASE("ztl::byte supports integral shifts") {
     CHECK(ztl::to_integer<unsigned>(make_byte(0x01u) << 3u) == 0x08u);
     CHECK(ztl::to_integer<unsigned>(make_byte(0x80u) >> 7u) == 0x01u);
 
@@ -116,8 +108,7 @@ TEST_CASE("ztl::byte supports integral shifts")
     CHECK(ztl::to_integer<unsigned>(value) == 0x06u);
 }
 
-TEST_CASE("ztl::byte rejects arithmetic and non-integral shift expressions")
-{
+TEST_CASE("ztl::byte rejects arithmetic and non-integral shift expressions") {
     CHECK_FALSE((has_plus<ztl::byte, ztl::byte>::value));
     CHECK_FALSE((has_minus<ztl::byte, ztl::byte>::value));
     CHECK_FALSE((has_multiply<ztl::byte, ztl::byte>::value));
@@ -129,8 +120,7 @@ TEST_CASE("ztl::byte rejects arithmetic and non-integral shift expressions")
     CHECK_FALSE((has_right_shift<ztl::byte, float>::value));
 }
 
-TEST_CASE("ztl::byte bit helpers read and modify individual bits")
-{
+TEST_CASE("ztl::byte bit helpers read and modify individual bits") {
     auto value = make_byte(0x00u);
 
     CHECK_FALSE(ztl::get_bit(value, 0u));
@@ -156,21 +146,17 @@ TEST_CASE("ztl::byte bit helpers read and modify individual bits")
     CHECK(ztl::to_integer<unsigned>(value) == 0x00u);
 }
 
-namespace
-{
-struct source_value final
-{
+namespace {
+struct source_value final {
     std::uint16_t value;
 };
 
-struct target_value final
-{
+struct target_value final {
     std::uint16_t value;
 };
 } // namespace
 
-TEST_CASE("ztl::bit_cast copies bits between same-sized trivially copyable objects")
-{
+TEST_CASE("ztl::bit_cast copies bits between same-sized trivially copyable objects") {
     const source_value source{0x1234u};
     const auto         target = ztl::bit_cast<target_value>(source);
 

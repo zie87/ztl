@@ -11,34 +11,31 @@
 
 #include <type_traits>
 
-namespace ztl
-{
+namespace ztl {
 
 // NOTE: backport of C++17
-template<bool B>
+template <bool B>
 using bool_constant = std::integral_constant<bool, B>;
 
 // NOTE: backport of C++17
-template<typename...>
-struct make_void
-{
+template <typename...>
+struct make_void {
     using type = void;
 };
 
-template<typename... T>
+template <typename... T>
 using void_t = typename make_void<T...>::type;
 
 // NOTE: backport of C++20
-template<class T>
+template <class T>
 using remove_cv_t = typename std::remove_cv<T>::type;
 
-template<class T>
-struct remove_cvref
-{
+template <class T>
+struct remove_cvref {
     using type = std::remove_cv_t<std::remove_reference_t<T>>;
 };
 
-template<class T>
+template <class T>
 using remove_cvref_t = typename remove_cvref<T>::type;
 } // namespace ztl
 
