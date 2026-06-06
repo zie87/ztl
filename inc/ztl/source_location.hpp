@@ -11,14 +11,11 @@
 
 #include "ztl/macros.hpp"
 
-namespace ztl
-{
+namespace ztl {
 // NOTE: backport of C++20 std::source-location
-class source_location
-{
+class source_location {
 public:
-    static inline constexpr auto current(const char* fna, unsigned lin, const char* fun) noexcept
-        -> source_location;
+    static inline constexpr auto current(const char* fna, unsigned lin, const char* fun) noexcept -> source_location;
 
     constexpr source_location(const char* fna, unsigned lin, const char* fun) noexcept;
 
@@ -32,26 +29,24 @@ private:
     const char* m_function_name;
 };
 
-inline constexpr source_location
-source_location::current(const char* fna, unsigned lin, const char* fun) noexcept
-{
+inline constexpr source_location source_location::current(const char* fna, unsigned lin, const char* fun) noexcept {
     return source_location(fna, lin, fun);
 }
 
 constexpr source_location::source_location(const char* fna, unsigned lin, const char* fun) noexcept
-: m_file_name(fna), m_line_number(lin), m_function_name(fun)
-{
-}
+    : m_file_name(fna), m_line_number(lin), m_function_name(fun) {}
 
-inline constexpr unsigned    source_location::line() const noexcept { return m_line_number; }
-inline constexpr const char* source_location::file_name() const noexcept { return m_file_name; }
-inline constexpr const char* source_location::function_name() const noexcept
-{
+inline constexpr unsigned source_location::line() const noexcept {
+    return m_line_number;
+}
+inline constexpr const char* source_location::file_name() const noexcept {
+    return m_file_name;
+}
+inline constexpr const char* source_location::function_name() const noexcept {
     return m_function_name;
 }
 } // namespace ztl
 
-#define ZTL_CURRENT_SOURCE_LOCATION                                                                \
-    ::ztl::source_location::current(ZTL_FILE_BASENAME, ZTL_LINE, ZTL_FUNC)
+#define ZTL_CURRENT_SOURCE_LOCATION ::ztl::source_location::current(ZTL_FILE_BASENAME, ZTL_LINE, ZTL_FUNC)
 
 #endif // ZTL_SOURCELOCATION_HPP

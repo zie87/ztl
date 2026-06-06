@@ -15,42 +15,34 @@
 #include <type_traits>
 #include <utility>
 
-namespace ztl
-{
+namespace ztl {
 
 // NOTE: Equivalent to C++17 std::size(container)
-template<typename CONTAINER_T>
+template <typename CONTAINER_T>
 inline constexpr auto size(const CONTAINER_T& container) noexcept(noexcept(container.size()))
-    -> decltype(container.size())
-{
+    -> decltype(container.size()) {
     return container.size();
 }
 
 // NOTE: Equivalent to C++17 std::size(array)
-template<typename T, std::size_t N>
-inline constexpr auto size(const T (&)[N]) noexcept -> std::size_t
-{
+template <typename T, std::size_t N>
+inline constexpr auto size(const T (&)[N]) noexcept -> std::size_t {
     return N;
 }
 
 // NOTE: Equivalent to C++20 std::ssize(container)
-template<typename CONTAINER_T>
+template <typename CONTAINER_T>
 inline constexpr auto ssize(const CONTAINER_T& container) noexcept(noexcept(container.size())) ->
-    typename std::common_type<std::ptrdiff_t,
-                              typename std::make_signed<decltype(container.size())>::type>::type
-{
-    typedef
-        typename std::common_type<std::ptrdiff_t,
-                                  typename std::make_signed<decltype(container.size())>::type>::type
-            result_type;
+    typename std::common_type<std::ptrdiff_t, typename std::make_signed<decltype(container.size())>::type>::type {
+    typedef typename std::common_type<std::ptrdiff_t, typename std::make_signed<decltype(container.size())>::type>::type
+        result_type;
 
     return static_cast<result_type>(container.size());
 }
 
 // NOTE: Equivalent to C++20 std::ssize(array)
-template<typename T, std::size_t N>
-inline constexpr auto ssize(const T (&)[N]) noexcept -> std::ptrdiff_t
-{
+template <typename T, std::size_t N>
+inline constexpr auto ssize(const T (&)[N]) noexcept -> std::ptrdiff_t {
     return static_cast<std::ptrdiff_t>(N);
 }
 

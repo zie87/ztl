@@ -20,15 +20,11 @@
 #include <algorithm>
 #include <array>
 
-namespace ztl
-{
+namespace ztl {
 
-namespace details
-{
-template<typename T, std::size_t EXTENT_V, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
-inline constexpr auto write_to_buffer(T value, ztl::span<ztl::byte, EXTENT_V> buffer) noexcept
-    -> std::size_t
-{
+namespace details {
+template <typename T, std::size_t EXTENT_V, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+inline constexpr auto write_to_buffer(T value, ztl::span<ztl::byte, EXTENT_V> buffer) noexcept -> std::size_t {
     static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
     static_assert(EXTENT_V == ztl::dynamic_extent || sizeof(T) <= EXTENT_V,
                   "Destination buffer is statically too small for T");
@@ -41,11 +37,8 @@ inline constexpr auto write_to_buffer(T value, ztl::span<ztl::byte, EXTENT_V> bu
     return byte_count;
 }
 
-template<typename T, std::size_t EXTENT_V, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
-inline constexpr auto read_from_buffer(T&                                   value,
-                                       ztl::span<const ztl::byte, EXTENT_V> buffer) noexcept
-    -> std::size_t
-{
+template <typename T, std::size_t EXTENT_V, std::enable_if_t<std::is_unsigned<T>::value, int> = 0>
+inline constexpr auto read_from_buffer(T& value, ztl::span<const ztl::byte, EXTENT_V> buffer) noexcept -> std::size_t {
     static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
     static_assert(EXTENT_V == ztl::dynamic_extent || sizeof(T) <= EXTENT_V,
                   "Source buffer is statically too small for T");
@@ -61,26 +54,19 @@ inline constexpr auto read_from_buffer(T&                                   valu
 
 } // namespace details
 
-template<ztl::endian ENDIAN_V = ztl::endian::little, typename T, std::size_t EXTENT_V>
-inline constexpr auto serialize_to(T value, ztl::span<ztl::byte, EXTENT_V> buffer) noexcept
-    -> std::size_t
-{
+template <ztl::endian ENDIAN_V = ztl::endian::little, typename T, std::size_t EXTENT_V>
+inline constexpr auto serialize_to(T value, ztl::span<ztl::byte, EXTENT_V> buffer) noexcept -> std::size_t {
     return details::write_to_buffer(endian_swap<ztl::endian::native, ENDIAN_V>(value), buffer);
 }
 
-template<ztl::endian ENDIAN_V = ztl::endian::little, typename T, std::size_t EXTENT_V>
-inline constexpr auto serialize_to(T                              val,
-                                   ztl::span<ztl::byte, EXTENT_V> buffer,
-                                   std::ptrdiff_t                 offset) noexcept -> std::size_t
-{
+template <ztl::endian ENDIAN_V = ztl::endian::little, typename T, std::size_t EXTENT_V>
+inline constexpr auto serialize_to(T val, ztl::span<ztl::byte, EXTENT_V> buffer, std::ptrdiff_t offset) noexcept
+    -> std::size_t {
     return serialize_to<ENDIAN_V>(val, buffer.subspan(offset));
 }
 
-template<ztl::endian ENDIAN_V = ztl::endian::little, typename T, std::size_t EXTENT_V>
-inline constexpr auto deserialize_from(T&                                   value,
-                                       ztl::span<const ztl::byte, EXTENT_V> buffer) noexcept
-    -> std::size_t
-{
+template <ztl::endian ENDIAN_V = ztl::endian::little, typename T, std::size_t EXTENT_V>
+inline constexpr auto deserialize_from(T& value, ztl::span<const ztl::byte, EXTENT_V> buffer) noexcept -> std::size_t {
     static_assert(std::is_trivially_copyable<T>::value, "T must be trivially copyable");
 
     using unsigned_type = std::make_unsigned_t<T>;
@@ -93,11 +79,9 @@ inline constexpr auto deserialize_from(T&                                   valu
     return size;
 }
 
-template<ztl::endian ENDIAN_V = ztl::endian::little, typename T, std::size_t EXTENT_V>
-inline constexpr auto deserialize_from(T&                                   value,
-                                       ztl::span<const ztl::byte, EXTENT_V> buffer,
-                                       std::ptrdiff_t offset) noexcept -> std::size_t
-{
+template <ztl::endian ENDIAN_V = ztl::endian::little, typename T, std::size_t EXTENT_V>
+inline constexpr auto deserialize_from(T& value, ztl::span<const ztl::byte, EXTENT_V> buffer,
+                                       std::ptrdiff_t offset) noexcept -> std::size_t {
     return deserialize_from<ENDIAN_V>(value, buffer.subspan(offset));
 }
 

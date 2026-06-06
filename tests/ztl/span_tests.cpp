@@ -12,40 +12,30 @@
 #include <type_traits>
 #include <utility>
 
-namespace
-{
+namespace {
 
-template<typename Span, typename = void>
-struct can_as_writable_bytes : std::false_type
-{
-};
+template <typename Span, typename = void>
+struct can_as_writable_bytes : std::false_type {};
 
-template<typename Span>
-struct can_as_writable_bytes<Span,
-                             ztl::void_t<decltype(ztl::as_writable_bytes(std::declval<Span>()))>>
-: std::true_type
-{
-};
+template <typename Span>
+struct can_as_writable_bytes<Span, ztl::void_t<decltype(ztl::as_writable_bytes(std::declval<Span>()))>>
+    : std::true_type {};
 
 } // namespace
 
-TEST_CASE("span type traits and compile-time API contracts")
-{
+TEST_CASE("span type traits and compile-time API contracts") {
     static_assert(ztl::dynamic_extent == std::numeric_limits<std::size_t>::max(),
                   "dynamic_extent must use the sentinel max size_t value");
 
-    static_assert(ztl::span<int>::extent == ztl::dynamic_extent,
-                  "dynamic extent span must expose dynamic_extent");
-    static_assert(ztl::span<int, 4>::extent == 4U,
-                  "fixed extent span must expose its fixed extent");
+    static_assert(ztl::span<int>::extent == ztl::dynamic_extent, "dynamic extent span must expose dynamic_extent");
+    static_assert(ztl::span<int, 4>::extent == 4U, "fixed extent span must expose its fixed extent");
 
     static_assert(std::is_same<ztl::span<int>::element_type, int>::value, "element_type must be T");
     static_assert(std::is_same<ztl::span<const int>::element_type, const int>::value,
                   "element_type must preserve const");
     static_assert(std::is_same<ztl::span<volatile int>::element_type, volatile int>::value,
                   "element_type must preserve volatile");
-    static_assert(std::is_same<ztl::span<int>::value_type, int>::value,
-                  "value_type must remove cv qualifiers");
+    static_assert(std::is_same<ztl::span<int>::value_type, int>::value, "value_type must remove cv qualifiers");
     static_assert(std::is_same<ztl::span<const volatile int>::value_type, int>::value,
                   "value_type must remove const and volatile qualifiers");
 
@@ -78,13 +68,10 @@ TEST_CASE("span type traits and compile-time API contracts")
     static_assert(!std::is_constructible<ztl::span<int>, ztl::span<const int, 3>>::value,
                   "const span must not convert to mutable span");
 
-    static_assert(can_as_writable_bytes<ztl::span<int>>::value,
-                  "mutable span must support as_writable_bytes");
-    static_assert(!can_as_writable_bytes<ztl::span<const int>>::value,
-                  "const span must not support as_writable_bytes");
+    static_assert(can_as_writable_bytes<ztl::span<int>>::value, "mutable span must support as_writable_bytes");
+    static_assert(!can_as_writable_bytes<ztl::span<const int>>::value, "const span must not support as_writable_bytes");
 
-    static_assert(std::is_default_constructible<ztl::span<int>>::value,
-                  "dynamic span should be default constructible");
+    static_assert(std::is_default_constructible<ztl::span<int>>::value, "dynamic span should be default constructible");
     static_assert(std::is_default_constructible<ztl::span<int, 0>>::value,
                   "zero-extent span should be default constructible");
     static_assert(!std::is_default_constructible<ztl::span<int, 1>>::value,
@@ -98,13 +85,8 @@ TEST_CASE("span type traits and compile-time API contracts")
     CHECK(true);
 }
 
-TEST_CASE_TEMPLATE("span constructs from C arrays",
-                   Span,
-                   ztl::span<int, 3>,
-                   ztl::span<int>,
-                   ztl::span<const int, 3>,
-                   ztl::span<const int>)
-{
+TEST_CASE_TEMPLATE("span constructs from C arrays", Span, ztl::span<int, 3>, ztl::span<int>, ztl::span<const int, 3>,
+                   ztl::span<const int>) {
     int  data[] = {10, 20, 30};
     Span view{data};
 
@@ -115,11 +97,7 @@ TEST_CASE_TEMPLATE("span constructs from C arrays",
     CHECK(std::equal(view.begin(), view.end(), data));
 }
 
-TEST_CASE_TEMPLATE("span constructs from pointer and size",
-                   Span,
-                   ztl::span<const int, 5>,
-                   ztl::span<const int>)
-{
+TEST_CASE_TEMPLATE("span constructs from pointer and size", Span, ztl::span<const int, 5>, ztl::span<const int>) {
     const int data[] = {1, 2, 3, 4, 5};
     Span      view{data, sizeof(data) / sizeof(data[0])};
 
@@ -130,11 +108,7 @@ TEST_CASE_TEMPLATE("span constructs from pointer and size",
     CHECK(std::equal(view.begin(), view.end(), data));
 }
 
-TEST_CASE_TEMPLATE("span constructs from pointer pair",
-                   Span,
-                   ztl::span<const int, 5>,
-                   ztl::span<const int>)
-{
+TEST_CASE_TEMPLATE("span constructs from pointer pair", Span, ztl::span<const int, 5>, ztl::span<const int>) {
     const int data[] = {11, 22, 33, 44, 55};
     Span      view{data, data + (sizeof(data) / sizeof(data[0]))};
 
@@ -145,11 +119,8 @@ TEST_CASE_TEMPLATE("span constructs from pointer pair",
     CHECK(std::equal(view.begin(), view.end(), data));
 }
 
-TEST_CASE("span constructs from std::array")
-{
-    std::array<char, 4> data{
-        {'a', 'b', 'c', 'd'}
-    };
+TEST_CASE("span constructs from std::array") {
+    std::array<char, 4> data{{'a', 'b', 'c', 'd'}};
 
     ztl::span<char, 4>       fixed{data};
     ztl::span<char>          dynamic{data};
@@ -173,11 +144,8 @@ TEST_CASE("span constructs from std::array")
     CHECK(data[1] == 'x');
 }
 
-TEST_CASE("span constructs from const std::array")
-{
-    const std::array<int, 3> data{
-        {7, 8, 9}
-    };
+TEST_CASE("span constructs from const std::array") {
+    const std::array<int, 3> data{{7, 8, 9}};
 
     ztl::span<const int, 3> fixed{data};
     ztl::span<const int>    dynamic{data};
@@ -190,29 +158,23 @@ TEST_CASE("span constructs from const std::array")
     CHECK(std::equal(dynamic.begin(), dynamic.end(), data.begin()));
 }
 
-TEST_CASE("make_span preserves fixed extent for arrays")
-{
+TEST_CASE("make_span preserves fixed extent for arrays") {
     int  data[] = {5, 6, 7};
     auto view   = ztl::make_span(data);
 
-    static_assert(
-        std::is_same<typename ztl::remove_cvref<decltype(view)>::type, ztl::span<int, 3>>::value,
-        "make_span(C array) must produce a fixed-extent span");
+    static_assert(std::is_same<typename ztl::remove_cvref<decltype(view)>::type, ztl::span<int, 3>>::value,
+                  "make_span(C array) must produce a fixed-extent span");
 
     CHECK(view.size() == 3U);
     CHECK(view.data() == data);
     CHECK(std::equal(view.begin(), view.end(), data));
 }
 
-TEST_CASE("make_span preserves fixed extent for std::array")
-{
-    std::array<std::uint8_t, 4> data{
-        {1U, 2U, 3U, 4U}
-    };
-    auto view = ztl::make_span(data);
+TEST_CASE("make_span preserves fixed extent for std::array") {
+    std::array<std::uint8_t, 4> data{{1U, 2U, 3U, 4U}};
+    auto                        view = ztl::make_span(data);
 
-    static_assert(std::is_same<typename ztl::remove_cvref<decltype(view)>::type,
-                               ztl::span<std::uint8_t, 4>>::value,
+    static_assert(std::is_same<typename ztl::remove_cvref<decltype(view)>::type, ztl::span<std::uint8_t, 4>>::value,
                   "make_span(std::array&) must produce a fixed-extent span");
 
     CHECK(view.size() == data.size());
@@ -220,8 +182,7 @@ TEST_CASE("make_span preserves fixed extent for std::array")
     CHECK(std::equal(view.begin(), view.end(), data.begin()));
 }
 
-TEST_CASE("span copy, assignment, and conversion construction")
-{
+TEST_CASE("span copy, assignment, and conversion construction") {
     int data[] = {1, 2, 3};
 
     ztl::span<int, 3> fixed{data};
@@ -249,13 +210,8 @@ TEST_CASE("span copy, assignment, and conversion construction")
     CHECK(fixed_from_dynamic.size() == 3U);
 }
 
-TEST_CASE_TEMPLATE("span observers report storage properties",
-                   Span,
-                   ztl::span<int, 5>,
-                   ztl::span<int>,
-                   ztl::span<const int, 5>,
-                   ztl::span<const int>)
-{
+TEST_CASE_TEMPLATE("span observers report storage properties", Span, ztl::span<int, 5>, ztl::span<int>,
+                   ztl::span<const int, 5>, ztl::span<const int>) {
     int  data[] = {3, 4, 5, 10, 1};
     Span view{data};
 
@@ -272,11 +228,7 @@ TEST_CASE_TEMPLATE("span observers report storage properties",
     CHECK(view.at(3) == 10);
 }
 
-TEST_CASE_TEMPLATE("mutable span element access aliases original storage",
-                   Span,
-                   ztl::span<int, 5>,
-                   ztl::span<int>)
-{
+TEST_CASE_TEMPLATE("mutable span element access aliases original storage", Span, ztl::span<int, 5>, ztl::span<int>) {
     int  data[] = {3, 4, 5, 10, 1};
     Span view{data};
 
@@ -290,8 +242,7 @@ TEST_CASE_TEMPLATE("mutable span element access aliases original storage",
     CHECK(data[4] == -9);
 }
 
-TEST_CASE("span supports zero-length views")
-{
+TEST_CASE("span supports zero-length views") {
     int data[] = {1, 2, 3};
 
     ztl::span<int, 0> zero_fixed{data, std::size_t{0}};
@@ -323,27 +274,20 @@ TEST_CASE("span supports zero-length views")
 #endif
 }
 
-TEST_CASE_TEMPLATE("span iterators model random access",
-                   Span,
-                   ztl::span<int, 5>,
-                   ztl::span<int>,
-                   ztl::span<const int, 5>,
-                   ztl::span<const int>)
-{
-    static_assert(
-        std::is_same<typename std::iterator_traits<typename Span::iterator>::iterator_category,
-                     std::random_access_iterator_tag>::value,
-        "span iterator must be random access");
+TEST_CASE_TEMPLATE("span iterators model random access", Span, ztl::span<int, 5>, ztl::span<int>,
+                   ztl::span<const int, 5>, ztl::span<const int>) {
+    static_assert(std::is_same<typename std::iterator_traits<typename Span::iterator>::iterator_category,
+                               std::random_access_iterator_tag>::value,
+                  "span iterator must be random access");
     static_assert(std::is_same<typename std::iterator_traits<typename Span::iterator>::value_type,
                                typename Span::value_type>::value,
                   "iterator value_type must match span value_type");
+    static_assert(std::is_same<typename std::iterator_traits<typename Span::iterator>::difference_type,
+                               typename Span::difference_type>::value,
+                  "iterator difference_type must match span difference_type");
     static_assert(
-        std::is_same<typename std::iterator_traits<typename Span::iterator>::difference_type,
-                     typename Span::difference_type>::value,
-        "iterator difference_type must match span difference_type");
-    static_assert(std::is_same<typename std::iterator_traits<typename Span::iterator>::pointer,
-                               typename Span::pointer>::value,
-                  "iterator pointer must match span pointer");
+        std::is_same<typename std::iterator_traits<typename Span::iterator>::pointer, typename Span::pointer>::value,
+        "iterator pointer must match span pointer");
     static_assert(std::is_same<typename std::iterator_traits<typename Span::iterator>::reference,
                                typename Span::reference>::value,
                   "iterator reference must match span reference");
@@ -392,15 +336,9 @@ TEST_CASE_TEMPLATE("span iterators model random access",
     CHECK(view.end() >= view.end());
 }
 
-TEST_CASE_TEMPLATE("span reverse iterators traverse from back to front",
-                   Span,
-                   ztl::span<int, 5>,
-                   ztl::span<int>,
-                   ztl::span<const int, 5>,
-                   ztl::span<const int>)
-{
-    static_assert(std::is_same<typename Span::reverse_iterator,
-                               std::reverse_iterator<typename Span::iterator>>::value,
+TEST_CASE_TEMPLATE("span reverse iterators traverse from back to front", Span, ztl::span<int, 5>, ztl::span<int>,
+                   ztl::span<const int, 5>, ztl::span<const int>) {
+    static_assert(std::is_same<typename Span::reverse_iterator, std::reverse_iterator<typename Span::iterator>>::value,
                   "reverse_iterator must be std::reverse_iterator<iterator>");
 
     int  data[]     = {2, 4, 6, 8, 10};
@@ -412,13 +350,8 @@ TEST_CASE_TEMPLATE("span reverse iterators traverse from back to front",
     CHECK(std::equal(view.rbegin(), view.rend(), reversed));
 }
 
-TEST_CASE_TEMPLATE("span iterators work with standard algorithms",
-                   Span,
-                   ztl::span<int, 5>,
-                   ztl::span<int>,
-                   ztl::span<const int, 5>,
-                   ztl::span<const int>)
-{
+TEST_CASE_TEMPLATE("span iterators work with standard algorithms", Span, ztl::span<int, 5>, ztl::span<int>,
+                   ztl::span<const int, 5>, ztl::span<const int>) {
     int  data[] = {2, 4, 6, 8, 10};
     Span view{data};
 
@@ -427,8 +360,7 @@ TEST_CASE_TEMPLATE("span iterators work with standard algorithms",
     CHECK(std::find(view.begin(), view.end(), 8) == view.begin() + 3);
 }
 
-TEST_CASE("mutable and const span iterators compare across cv-qualified views")
-{
+TEST_CASE("mutable and const span iterators compare across cv-qualified views") {
     int data[] = {1, 2, 3, 4};
 
     ztl::span<int, 4>       mutable_fixed{data};
@@ -447,26 +379,19 @@ TEST_CASE("mutable and const span iterators compare across cv-qualified views")
     CHECK(const_dynamic.end() - mutable_dynamic.begin() == 4);
 }
 
-TEST_CASE_TEMPLATE("span subviews preserve values, extents, and storage",
-                   Span,
-                   ztl::span<int, 6>,
-                   ztl::span<int>)
-{
+TEST_CASE_TEMPLATE("span subviews preserve values, extents, and storage", Span, ztl::span<int, 6>, ztl::span<int>) {
     int  data[] = {10, 20, 30, 40, 50, 60};
     Span view{data};
 
-    SUBCASE("first<N> and first(count)")
-    {
+    SUBCASE("first<N> and first(count)") {
         const auto fixed    = view.template first<3>();
         const auto dyn      = view.first(3U);
         int        expect[] = {10, 20, 30};
 
-        static_assert(std::is_same<typename ztl::remove_cvref<decltype(fixed)>::type,
-                                   ztl::span<int, 3>>::value,
+        static_assert(std::is_same<typename ztl::remove_cvref<decltype(fixed)>::type, ztl::span<int, 3>>::value,
                       "first<N>() must return fixed extent N");
-        static_assert(
-            std::is_same<typename ztl::remove_cvref<decltype(dyn)>::type, ztl::span<int>>::value,
-            "first(count) must return dynamic extent");
+        static_assert(std::is_same<typename ztl::remove_cvref<decltype(dyn)>::type, ztl::span<int>>::value,
+                      "first(count) must return dynamic extent");
 
         CHECK(fixed.size() == 3U);
         CHECK(dyn.size() == 3U);
@@ -476,18 +401,15 @@ TEST_CASE_TEMPLATE("span subviews preserve values, extents, and storage",
         CHECK(std::equal(dyn.begin(), dyn.end(), expect));
     }
 
-    SUBCASE("last<N> and last(count)")
-    {
+    SUBCASE("last<N> and last(count)") {
         const auto fixed    = view.template last<2>();
         const auto dyn      = view.last(2U);
         int        expect[] = {50, 60};
 
-        static_assert(std::is_same<typename ztl::remove_cvref<decltype(fixed)>::type,
-                                   ztl::span<int, 2>>::value,
+        static_assert(std::is_same<typename ztl::remove_cvref<decltype(fixed)>::type, ztl::span<int, 2>>::value,
                       "last<N>() must return fixed extent N");
-        static_assert(
-            std::is_same<typename ztl::remove_cvref<decltype(dyn)>::type, ztl::span<int>>::value,
-            "last(count) must return dynamic extent");
+        static_assert(std::is_same<typename ztl::remove_cvref<decltype(dyn)>::type, ztl::span<int>>::value,
+                      "last(count) must return dynamic extent");
 
         CHECK(fixed.size() == 2U);
         CHECK(dyn.size() == 2U);
@@ -497,22 +419,18 @@ TEST_CASE_TEMPLATE("span subviews preserve values, extents, and storage",
         CHECK(std::equal(dyn.begin(), dyn.end(), expect));
     }
 
-    SUBCASE("subspan<offset>() and subspan(offset)")
-    {
+    SUBCASE("subspan<offset>() and subspan(offset)") {
         const auto fixed_tail = view.template subspan<2>();
         const auto dyn_tail   = view.subspan(2U);
         int        expect[]   = {30, 40, 50, 60};
 
         static_assert(
-            (std::is_same<Span, ztl::span<int, 6>>::value
-             && std::is_same<typename ztl::remove_cvref<decltype(fixed_tail)>::type,
-                             ztl::span<int, 4>>::value)
-                || (std::is_same<Span, ztl::span<int>>::value
-                    && std::is_same<typename ztl::remove_cvref<decltype(fixed_tail)>::type,
-                                    ztl::span<int>>::value),
+            (std::is_same<Span, ztl::span<int, 6>>::value &&
+             std::is_same<typename ztl::remove_cvref<decltype(fixed_tail)>::type, ztl::span<int, 4>>::value) ||
+                (std::is_same<Span, ztl::span<int>>::value &&
+                 std::is_same<typename ztl::remove_cvref<decltype(fixed_tail)>::type, ztl::span<int>>::value),
             "subspan<offset>() must calculate a fixed tail extent only for fixed-extent spans");
-        static_assert(std::is_same<typename ztl::remove_cvref<decltype(dyn_tail)>::type,
-                                   ztl::span<int>>::value,
+        static_assert(std::is_same<typename ztl::remove_cvref<decltype(dyn_tail)>::type, ztl::span<int>>::value,
                       "subspan(offset) must return dynamic extent");
 
         CHECK(fixed_tail.size() == 4U);
@@ -523,17 +441,14 @@ TEST_CASE_TEMPLATE("span subviews preserve values, extents, and storage",
         CHECK(std::equal(dyn_tail.begin(), dyn_tail.end(), expect));
     }
 
-    SUBCASE("subspan<offset, count>() and subspan(offset, count)")
-    {
+    SUBCASE("subspan<offset, count>() and subspan(offset, count)") {
         const auto fixed_mid = view.template subspan<1, 3>();
         const auto dyn_mid   = view.subspan(1U, 3U);
         int        expect[]  = {20, 30, 40};
 
-        static_assert(std::is_same<typename ztl::remove_cvref<decltype(fixed_mid)>::type,
-                                   ztl::span<int, 3>>::value,
+        static_assert(std::is_same<typename ztl::remove_cvref<decltype(fixed_mid)>::type, ztl::span<int, 3>>::value,
                       "subspan<offset, count>() must return fixed extent count");
-        static_assert(std::is_same<typename ztl::remove_cvref<decltype(dyn_mid)>::type,
-                                   ztl::span<int>>::value,
+        static_assert(std::is_same<typename ztl::remove_cvref<decltype(dyn_mid)>::type, ztl::span<int>>::value,
                       "subspan(offset, count) must return dynamic extent");
 
         CHECK(fixed_mid.size() == 3U);
@@ -544,8 +459,7 @@ TEST_CASE_TEMPLATE("span subviews preserve values, extents, and storage",
         CHECK(std::equal(dyn_mid.begin(), dyn_mid.end(), expect));
     }
 
-    SUBCASE("subviews alias the original storage")
-    {
+    SUBCASE("subviews alias the original storage") {
         auto mid = view.template subspan<2, 2>();
         mid[0]   = 300;
         mid[1]   = 400;
@@ -554,8 +468,7 @@ TEST_CASE_TEMPLATE("span subviews preserve values, extents, and storage",
         CHECK(data[3] == 400);
     }
 
-    SUBCASE("zero-length subviews from non-empty storage")
-    {
+    SUBCASE("zero-length subviews from non-empty storage") {
         const auto first_zero = view.template first<0>();
         const auto last_zero  = view.template last<0>();
         const auto mid_zero   = view.template subspan<3, 0>();
@@ -573,10 +486,8 @@ TEST_CASE_TEMPLATE("span subviews preserve values, extents, and storage",
     }
 }
 
-TEST_CASE("span preserves const and volatile element qualifiers")
-{
-    SUBCASE("const span exposes const elements")
-    {
+TEST_CASE("span preserves const and volatile element qualifiers") {
+    SUBCASE("const span exposes const elements") {
         int                     data[] = {9, 8, 7};
         ztl::span<const int, 3> view{data};
 
@@ -590,8 +501,7 @@ TEST_CASE("span preserves const and volatile element qualifiers")
         CHECK(view[2] == 7);
     }
 
-    SUBCASE("volatile span exposes volatile elements")
-    {
+    SUBCASE("volatile span exposes volatile elements") {
         volatile std::uint32_t               regs[] = {0x10U, 0x20U};
         ztl::span<volatile std::uint32_t, 2> view{regs};
 
@@ -607,46 +517,37 @@ TEST_CASE("span preserves const and volatile element qualifiers")
     }
 }
 
-TEST_CASE_TEMPLATE("as_bytes exposes byte-sized views",
-                   Span,
-                   ztl::span<std::uint16_t, 3>,
-                   ztl::span<std::uint16_t>)
-{
+TEST_CASE_TEMPLATE("as_bytes exposes byte-sized views", Span, ztl::span<std::uint16_t, 3>, ztl::span<std::uint16_t>) {
     std::uint16_t data[] = {0x1122U, 0x3344U, 0x5566U};
     Span          words{data};
 
     auto bytes = ztl::as_bytes(words);
 
-    static_assert((std::is_same<Span, ztl::span<std::uint16_t, 3>>::value
-                   && std::is_same<typename ztl::remove_cvref<decltype(bytes)>::type,
-                                   ztl::span<const ztl::byte, sizeof(data)>>::value)
-                      || (std::is_same<Span, ztl::span<std::uint16_t>>::value
-                          && std::is_same<typename ztl::remove_cvref<decltype(bytes)>::type,
-                                          ztl::span<const ztl::byte>>::value),
-                  "as_bytes must preserve fixed byte extent and keep dynamic spans dynamic");
+    static_assert(
+        (std::is_same<Span, ztl::span<std::uint16_t, 3>>::value &&
+         std::is_same<typename ztl::remove_cvref<decltype(bytes)>::type,
+                      ztl::span<const ztl::byte, sizeof(data)>>::value) ||
+            (std::is_same<Span, ztl::span<std::uint16_t>>::value &&
+             std::is_same<typename ztl::remove_cvref<decltype(bytes)>::type, ztl::span<const ztl::byte>>::value),
+        "as_bytes must preserve fixed byte extent and keep dynamic spans dynamic");
 
     CHECK(bytes.size() == sizeof(data));
     CHECK(bytes.size_bytes() == sizeof(data));
     CHECK(reinterpret_cast<const void*>(bytes.data()) == reinterpret_cast<const void*>(data));
 }
 
-TEST_CASE_TEMPLATE("as_writable_bytes exposes mutable byte-sized views",
-                   Span,
-                   ztl::span<std::uint16_t, 3>,
-                   ztl::span<std::uint16_t>)
-{
+TEST_CASE_TEMPLATE("as_writable_bytes exposes mutable byte-sized views", Span, ztl::span<std::uint16_t, 3>,
+                   ztl::span<std::uint16_t>) {
     std::uint16_t data[] = {0x1122U, 0x3344U, 0x5566U};
     Span          words{data};
 
     auto bytes = ztl::as_writable_bytes(words);
 
     static_assert(
-        (std::is_same<Span, ztl::span<std::uint16_t, 3>>::value
-         && std::is_same<typename ztl::remove_cvref<decltype(bytes)>::type,
-                         ztl::span<ztl::byte, sizeof(data)>>::value)
-            || (std::is_same<Span, ztl::span<std::uint16_t>>::value
-                && std::is_same<typename ztl::remove_cvref<decltype(bytes)>::type,
-                                ztl::span<ztl::byte>>::value),
+        (std::is_same<Span, ztl::span<std::uint16_t, 3>>::value &&
+         std::is_same<typename ztl::remove_cvref<decltype(bytes)>::type, ztl::span<ztl::byte, sizeof(data)>>::value) ||
+            (std::is_same<Span, ztl::span<std::uint16_t>>::value &&
+             std::is_same<typename ztl::remove_cvref<decltype(bytes)>::type, ztl::span<ztl::byte>>::value),
         "as_writable_bytes must preserve fixed byte extent and keep dynamic spans dynamic");
 
     CHECK(bytes.size() == sizeof(data));
@@ -654,8 +555,7 @@ TEST_CASE_TEMPLATE("as_writable_bytes exposes mutable byte-sized views",
     CHECK(reinterpret_cast<void*>(bytes.data()) == reinterpret_cast<void*>(data));
 }
 
-TEST_CASE("as_writable_bytes is not available for const spans")
-{
+TEST_CASE("as_writable_bytes is not available for const spans") {
     static_assert(!can_as_writable_bytes<ztl::span<const std::uint16_t, 3>>::value,
                   "const fixed span must not support as_writable_bytes");
     static_assert(!can_as_writable_bytes<ztl::span<const std::uint16_t>>::value,
@@ -663,16 +563,13 @@ TEST_CASE("as_writable_bytes is not available for const spans")
     CHECK(true);
 }
 
-TEST_CASE("span object representation is compact for embedded use")
-{
+TEST_CASE("span object representation is compact for embedded use") {
     CHECK(sizeof(ztl::span<int, 4>) == sizeof(int*));
     CHECK(sizeof(ztl::span<int>) <= (sizeof(int*) + sizeof(std::size_t)));
 
-    static_assert(std::is_copy_constructible<ztl::span<int>>::value,
-                  "span must be copy constructible");
+    static_assert(std::is_copy_constructible<ztl::span<int>>::value, "span must be copy constructible");
     static_assert(std::is_copy_assignable<ztl::span<int>>::value, "span must be copy assignable");
     static_assert(std::is_nothrow_copy_constructible<ztl::span<int>>::value,
                   "span copy construction should be noexcept");
-    static_assert(std::is_nothrow_copy_assignable<ztl::span<int>>::value,
-                  "span copy assignment should be noexcept");
+    static_assert(std::is_nothrow_copy_assignable<ztl::span<int>>::value, "span copy assignment should be noexcept");
 }

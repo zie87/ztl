@@ -9,17 +9,12 @@
 #ifndef ZTL_MACROS_HPP
 #define ZTL_MACROS_HPP
 
-namespace ztl
-{
-namespace details
-{
-constexpr const char* file_basename(const char* path) noexcept
-{
+namespace ztl {
+namespace details {
+constexpr const char* file_basename(const char* path) noexcept {
     const char* last = path;
-    for (const char* p = path; *p; ++p)
-    {
-        if (*p == '/' || *p == '\\')
-        {
+    for (const char* p = path; *p; ++p) {
+        if (*p == '/' || *p == '\\') {
             last = p + 1;
         }
     }
