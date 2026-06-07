@@ -14,8 +14,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace ztl {
-namespace details {
+namespace ztl { namespace details {
 
 template <typename T, std::size_t SLOT_CNT>
 class raw_storage final {
@@ -61,7 +60,6 @@ private:
     alignas(T) unsigned char m_storage[SLOT_CNT * sizeof(T)];
 };
 
-} // namespace details
-} // namespace ztl
+}} // namespace ztl::details
 
 #endif // ZTL_DETAILS_RAWSTORAGE_HPP
