@@ -9,8 +9,7 @@
 #ifndef ZTL_MACROS_HPP
 #define ZTL_MACROS_HPP
 
-namespace ztl {
-namespace details {
+namespace ztl { namespace details {
 constexpr const char* file_basename(const char* path) noexcept {
     const char* last = path;
     for (const char* p = path; *p; ++p) {
@@ -20,8 +19,7 @@ constexpr const char* file_basename(const char* path) noexcept {
     }
     return last;
 }
-} // namespace details
-} // namespace ztl
+}} // namespace ztl::details
 
 #define ZTL_STR_(x) #x
 #define ZTL_STR(x) ZTL_STR_(x)
