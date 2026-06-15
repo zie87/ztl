@@ -40,11 +40,11 @@ struct is_span_iterator_interoperable
 };
 
 template <typename T>
-struct span_iterator : ztl::iterator_interface<span_iterator<T>, std::random_access_iterator_tag, T> {
+struct span_iterator : ztl::iterator_interface<span_iterator<T>, ztl::contiguous_iterator_tag, T> {
     template <typename>
     friend struct span_iterator;
 
-    using base            = ztl::iterator_interface<span_iterator<T>, std::random_access_iterator_tag, T>;
+    using base            = ztl::iterator_interface<span_iterator<T>, ztl::contiguous_iterator_tag, T>;
     using difference_type = typename base::difference_type;
     using reference       = typename base::reference;
 
@@ -67,9 +67,10 @@ struct span_iterator : ztl::iterator_interface<span_iterator<T>, std::random_acc
         : m_current(other.m_current), m_begin(other.m_begin), m_end(other.m_end) {}
 
     // Required primitives for ztl::iterator_interface random-access support.
-    // The interface synthesizes ++, --, -=, +, iterator - difference, and []
-    // from these operations.  The cv-interoperable comparisons below cover
-    // span_iterator<T> <-> span_iterator<const T>.
+    // The interface synthesizes ++, --, -=, +, iterator - difference, [], -> and
+    // the relational operators (!=, <, >, <=, >=) from operator* / operator+= /
+    // operator- / operator==.  The cv-interoperable operator- and operator==
+    // free functions below additionally cover span_iterator<T> <-> span_iterator<const T>.
     constexpr reference operator*() const noexcept {
         ZTL_EXPECTS(m_current != m_end);
         return *m_current;
@@ -151,35 +152,11 @@ operator==(const span_iterator<T>& lhs, const span_iterator<U>& rhs) noexcept {
     return lhs.m_current == rhs.m_current;
 }
 
-template <typename T, typename U>
-constexpr typename std::enable_if<is_span_iterator_interoperable<T, U>::value && !std::is_same<T, U>::value, bool>::type
-operator!=(const span_iterator<T>& lhs, const span_iterator<U>& rhs) noexcept {
-    return !(lhs == rhs);
-}
-
-template <typename T, typename U>
-constexpr typename std::enable_if<is_span_iterator_interoperable<T, U>::value && !std::is_same<T, U>::value, bool>::type
-operator<(const span_iterator<T>& lhs, const span_iterator<U>& rhs) noexcept {
-    return (lhs - rhs) < typename span_iterator<T>::difference_type(0);
-}
-
-template <typename T, typename U>
-constexpr typename std::enable_if<is_span_iterator_interoperable<T, U>::value && !std::is_same<T, U>::value, bool>::type
-operator>(const span_iterator<T>& lhs, const span_iterator<U>& rhs) noexcept {
-    return rhs < lhs;
-}
-
-template <typename T, typename U>
-constexpr typename std::enable_if<is_span_iterator_interoperable<T, U>::value && !std::is_same<T, U>::value, bool>::type
-operator<=(const span_iterator<T>& lhs, const span_iterator<U>& rhs) noexcept {
-    return !(rhs < lhs);
-}
-
-template <typename T, typename U>
-constexpr typename std::enable_if<is_span_iterator_interoperable<T, U>::value && !std::is_same<T, U>::value, bool>::type
-operator>=(const span_iterator<T>& lhs, const span_iterator<U>& rhs) noexcept {
-    return !(lhs < rhs);
-}
+// !=, <, >, <= and >= are not defined here: ztl::iterator_interface synthesises
+// them for the homogeneous case from operator== / operator-, and the cross-cv
+// case (span_iterator<T> vs span_iterator<const T>) resolves through those same
+// synthesised operators via the implicit span_iterator<T> -> span_iterator<const T>
+// conversion above.  Only the two genuine cross-cv primitives are kept.
 
 template <std::size_t EXTENT_V>
 struct extent_type {

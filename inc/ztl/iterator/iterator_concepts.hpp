@@ -9,6 +9,7 @@
 #ifndef ZTL_ITERATOR_ITERATORCONCEPTS_HPP
 #define ZTL_ITERATOR_ITERATORCONCEPTS_HPP
 
+#include "ztl/iterator/iterator_tags.hpp"
 #include "ztl/type_traits.hpp"
 #include "ztl/memory.hpp"
 
@@ -45,14 +46,6 @@
 // ===========================================================================
 
 namespace ztl {
-
-// C++14 has no std::contiguous_iterator_tag.  We provide one (refining
-// random-access) so that an iterator can advertise contiguity the way C++20
-// expects, via a member `using iterator_concept = ztl::contiguous_iterator_tag;`.
-// ztl::iterator_interface accepts it as its IteratorConcept argument: the
-// normalized operation tag is still random-access, the std iterator_category is
-// random_access_iterator_tag, and iterator_concept carries the contiguous tag.
-struct contiguous_iterator_tag : std::random_access_iterator_tag {};
 
 namespace details {
 
@@ -180,13 +173,14 @@ template <typename I>
 struct has_equality<I, void_t<decltype(std::declval<I const&>() == std::declval<I const&>()),
                               decltype(std::declval<I const&>() != std::declval<I const&>())>>
     : bool_constant<std::is_convertible<decltype(std::declval<I const&>() == std::declval<I const&>()), bool>::value &&
-                    std::is_convertible<decltype(std::declval<I const&>() != std::declval<I const&>()), bool>::value> {};
+                    std::is_convertible<decltype(std::declval<I const&>() != std::declval<I const&>()), bool>::value> {
+};
 
 template <typename I, typename = void>
 struct has_difference : std::false_type {};
 template <typename I>
-struct has_difference<I, void_t<typename iter_difference<I>::type,
-                                decltype(std::declval<I const&>() - std::declval<I const&>())>>
+struct has_difference<
+    I, void_t<typename iter_difference<I>::type, decltype(std::declval<I const&>() - std::declval<I const&>())>>
     : bool_constant<std::is_convertible<decltype(std::declval<I const&>() - std::declval<I const&>()),
                                         iter_difference_t<I>>::value> {};
 
@@ -234,15 +228,17 @@ struct has_ordering<I, void_t<decltype(std::declval<I const&>() < std::declval<I
     : bool_constant<std::is_convertible<decltype(std::declval<I const&>() < std::declval<I const&>()), bool>::value &&
                     std::is_convertible<decltype(std::declval<I const&>() > std::declval<I const&>()), bool>::value &&
                     std::is_convertible<decltype(std::declval<I const&>() <= std::declval<I const&>()), bool>::value &&
-                    std::is_convertible<decltype(std::declval<I const&>() >= std::declval<I const&>()), bool>::value> {};
+                    std::is_convertible<decltype(std::declval<I const&>() >= std::declval<I const&>()), bool>::value> {
+};
 
 // Writable<I, T>: *i = t and *i++ = t are valid (output requirement).
 template <typename I, typename T, typename = void>
 struct is_writable : std::false_type {};
 template <typename I, typename T>
-struct is_writable<I, T,
-                   void_t<decltype(*std::declval<I&>() = std::declval<T>()),
-                          decltype(*std::declval<I&>()++ = std::declval<T>())>> : std::true_type {};
+struct is_writable<
+    I, T,
+    void_t<decltype(*std::declval<I&>() = std::declval<T>()), decltype(*std::declval<I&>()++ = std::declval<T>())>>
+    : std::true_type {};
 
 // ---------------------------------------------------------------------------
 // Tier definitions (each builds on the previous one).
@@ -254,9 +250,8 @@ struct input_or_output_iterator
                     has_iter_concept<I>::value> {};
 
 template <typename I>
-struct input_iterator
-    : bool_constant<input_or_output_iterator<I>::value && has_equality<I>::value &&
-                    concept_at_least<I, std::input_iterator_tag>::value> {};
+struct input_iterator : bool_constant<input_or_output_iterator<I>::value && has_equality<I>::value &&
+                                      concept_at_least<I, std::input_iterator_tag>::value> {};
 
 template <typename I>
 struct forward_iterator
@@ -320,32 +315,31 @@ struct weakly_equality_comparable<S, I,
                                          decltype(std::declval<S const&>() == std::declval<I const&>()),
                                          decltype(std::declval<I const&>() != std::declval<S const&>()),
                                          decltype(std::declval<S const&>() != std::declval<I const&>())>>
-    : bool_constant<
-          std::is_convertible<decltype(std::declval<I const&>() == std::declval<S const&>()), bool>::value &&
-          std::is_convertible<decltype(std::declval<S const&>() == std::declval<I const&>()), bool>::value &&
-          std::is_convertible<decltype(std::declval<I const&>() != std::declval<S const&>()), bool>::value &&
-          std::is_convertible<decltype(std::declval<S const&>() != std::declval<I const&>()), bool>::value> {};
+    : bool_constant<std::is_convertible<decltype(std::declval<I const&>() == std::declval<S const&>()), bool>::value &&
+                    std::is_convertible<decltype(std::declval<S const&>() == std::declval<I const&>()), bool>::value &&
+                    std::is_convertible<decltype(std::declval<I const&>() != std::declval<S const&>()), bool>::value &&
+                    std::is_convertible<decltype(std::declval<S const&>() != std::declval<I const&>()), bool>::value> {
+};
 
 template <typename S, typename I, typename = void>
 struct has_sized_sentinel_difference : std::false_type {};
 template <typename S, typename I>
-struct has_sized_sentinel_difference<S, I,
-                                     void_t<typename iter_difference<I>::type,
-                                            decltype(std::declval<S const&>() - std::declval<I const&>()),
-                                            decltype(std::declval<I const&>() - std::declval<S const&>())>>
-    : bool_constant<
-          std::is_convertible<decltype(std::declval<S const&>() - std::declval<I const&>()), iter_difference_t<I>>::value &&
-          std::is_convertible<decltype(std::declval<I const&>() - std::declval<S const&>()), iter_difference_t<I>>::value> {};
+struct has_sized_sentinel_difference<
+    S, I,
+    void_t<typename iter_difference<I>::type, decltype(std::declval<S const&>() - std::declval<I const&>()),
+           decltype(std::declval<I const&>() - std::declval<S const&>())>>
+    : bool_constant<std::is_convertible<decltype(std::declval<S const&>() - std::declval<I const&>()),
+                                        iter_difference_t<I>>::value &&
+                    std::is_convertible<decltype(std::declval<I const&>() - std::declval<S const&>()),
+                                        iter_difference_t<I>>::value> {};
 
 template <typename S, typename I>
-struct sentinel_for
-    : bool_constant<input_or_output_iterator<I>::value && std::is_copy_constructible<S>::value &&
-                    std::is_copy_assignable<S>::value && std::is_default_constructible<S>::value &&
-                    weakly_equality_comparable<S, I>::value> {};
+struct sentinel_for : bool_constant<input_or_output_iterator<I>::value && std::is_copy_constructible<S>::value &&
+                                    std::is_copy_assignable<S>::value && std::is_default_constructible<S>::value &&
+                                    weakly_equality_comparable<S, I>::value> {};
 
 template <typename S, typename I>
-struct sized_sentinel_for
-    : bool_constant<sentinel_for<S, I>::value && has_sized_sentinel_difference<S, I>::value> {};
+struct sized_sentinel_for : bool_constant<sentinel_for<S, I>::value && has_sized_sentinel_difference<S, I>::value> {};
 
 } // namespace details
 
