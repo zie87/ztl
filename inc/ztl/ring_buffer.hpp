@@ -317,24 +317,33 @@ public:
         }
     }
 
+    // ----------------------------------------------------------------------
+    // Random-access iterator over the logical [0, size()) range.
+    //
+    // Only the four primitives are defined here: operator*, operator+=,
+    // operator- (iterator difference) and operator==.  ztl::iterator_interface
+    // synthesises everything else — ++/--, + , -(scalar), -=, [], ->, !=, the
+    // relational operators and all the nested typedefs (iterator_category,
+    // value_type, reference, pointer, difference_type).
+    //
+    // operator- and operator== are templated on the target constness so a
+    // mutable and a const iterator subtract and compare across constness; the
+    // synthesised relational operators then also work across constness via the
+    // implicit iterator -> const_iterator conversion below.
+    // ----------------------------------------------------------------------
     template <bool IS_CONST>
     class iterator_impl final
         : public ztl::iterator_interface<iterator_impl<IS_CONST>, std::random_access_iterator_tag, T,
                                          typename std::conditional<IS_CONST, const T&, T&>::type,
-                                         typename std::conditional<IS_CONST, const T*, T*>::type, std::ptrdiff_t> {
-        using ring_ptr = typename std::conditional<IS_CONST, const ring_buffer_base*, ring_buffer_base*>::type;
+                                         typename std::conditional<IS_CONST, const T*, T*>::type> {
+        using base_type = ztl::iterator_interface<iterator_impl<IS_CONST>, std::random_access_iterator_tag, T,
+                                                  typename std::conditional<IS_CONST, const T&, T&>::type,
+                                                  typename std::conditional<IS_CONST, const T*, T*>::type>;
+        using ring_ptr  = typename std::conditional<IS_CONST, const ring_buffer_base*, ring_buffer_base*>::type;
 
     public:
-        using base_type =
-            ztl::iterator_interface<iterator_impl<IS_CONST>, std::random_access_iterator_tag, T,
-                                    typename std::conditional<IS_CONST, const T&, T&>::type,
-                                    typename std::conditional<IS_CONST, const T*, T*>::type, std::ptrdiff_t>;
-
-        using iterator_category = std::random_access_iterator_tag;
-        using value_type        = T;
-        using difference_type   = std::ptrdiff_t;
-        using pointer           = typename std::conditional<IS_CONST, const T*, T*>::type;
-        using reference         = typename std::conditional<IS_CONST, const T&, T&>::type;
+        using typename base_type::difference_type;
+        using typename base_type::reference;
 
         iterator_impl() noexcept : m_ring{nullptr}, m_idx{0} {}
 
@@ -350,11 +359,6 @@ public:
             return *this;
         }
 
-        difference_type operator-(const iterator_impl& rhs) const noexcept {
-            ZTL_EXPECTS(m_ring == rhs.m_ring);
-            return m_idx - rhs.m_idx;
-        }
-
         template <bool C>
         difference_type operator-(const iterator_impl<C>& rhs) const noexcept {
             ZTL_EXPECTS(m_ring == rhs.m_ring);
@@ -364,35 +368,6 @@ public:
         template <bool C>
         bool operator==(const iterator_impl<C>& rhs) const noexcept {
             return (m_ring == rhs.m_ring) && (m_idx == rhs.m_idx);
-        }
-
-        template <bool C>
-        bool operator!=(const iterator_impl<C>& rhs) const noexcept {
-            return !(*this == rhs);
-        }
-
-        template <bool C>
-        bool operator<(const iterator_impl<C>& rhs) const noexcept {
-            ZTL_EXPECTS(m_ring == rhs.m_ring);
-            return m_idx < rhs.m_idx;
-        }
-
-        template <bool C>
-        bool operator>(const iterator_impl<C>& rhs) const noexcept {
-            ZTL_EXPECTS(m_ring == rhs.m_ring);
-            return rhs < *this;
-        }
-
-        template <bool C>
-        bool operator<=(const iterator_impl<C>& rhs) const noexcept {
-            ZTL_EXPECTS(m_ring == rhs.m_ring);
-            return !(rhs < *this);
-        }
-
-        template <bool C>
-        bool operator>=(const iterator_impl<C>& rhs) const noexcept {
-            ZTL_EXPECTS(m_ring == rhs.m_ring);
-            return !(*this < rhs);
         }
 
         template <bool B = IS_CONST, typename std::enable_if<!B, int>::type = 0>
@@ -429,9 +404,6 @@ private:
         const size_type physical = m_tail + logical_index;
         return (physical >= kSlots) ? (physical - kSlots) : physical;
     }
-
-    pointer       storage_ptr(size_type index) noexcept { return m_storage.ptr(index); }
-    const_pointer storage_ptr(size_type index) const noexcept { return m_storage.ptr(index); }
 
     reference       storage_ref(size_type index) noexcept { return m_storage.ref(index); }
     const_reference storage_ref(size_type index) const noexcept { return m_storage.ref(index); }
