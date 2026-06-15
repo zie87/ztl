@@ -9,6 +9,7 @@
 #ifndef ZTL_ITERATORINTERFACE_HPP
 #define ZTL_ITERATORINTERFACE_HPP
 
+#include "ztl/iterator/iterator_tags.hpp"
 #include "ztl/type_traits.hpp"
 #include "ztl/memory.hpp"
 
@@ -185,12 +186,11 @@ public:
 };
 
 template <typename IteratorConcept>
-struct supported_concept
-    : bool_constant<std::is_same<IteratorConcept, std::output_iterator_tag>::value ||
-                    std::is_base_of<std::input_iterator_tag, IteratorConcept>::value ||
-                    std::is_base_of<std::forward_iterator_tag, IteratorConcept>::value ||
-                    std::is_base_of<std::bidirectional_iterator_tag, IteratorConcept>::value ||
-                    std::is_base_of<std::random_access_iterator_tag, IteratorConcept>::value> {};
+struct supported_concept : bool_constant<std::is_same<IteratorConcept, std::output_iterator_tag>::value ||
+                                         std::is_base_of<std::input_iterator_tag, IteratorConcept>::value ||
+                                         std::is_base_of<std::forward_iterator_tag, IteratorConcept>::value ||
+                                         std::is_base_of<std::bidirectional_iterator_tag, IteratorConcept>::value ||
+                                         std::is_base_of<std::random_access_iterator_tag, IteratorConcept>::value> {};
 
 // -----------------------------------------------------------------------
 // iterator_category is present iff IteratorConcept is forward-or-better.

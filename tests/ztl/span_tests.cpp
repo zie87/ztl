@@ -1,4 +1,5 @@
 #include "ztl/span.hpp"
+#include "ztl/iterator/iterator_concepts.hpp"
 #include "ztl/type_traits.hpp"
 
 #include <doctest/doctest.h>
@@ -334,6 +335,47 @@ TEST_CASE_TEMPLATE("span iterators model random access", Span, ztl::span<int, 5>
     CHECK(view.begin() <= view.begin());
     CHECK(view.end() > view.begin());
     CHECK(view.end() >= view.end());
+}
+
+TEST_CASE("span iterator satisfies the ztl iterator concept traits") {
+    using mut_iter   = ztl::span<int>::iterator;
+    using const_iter = ztl::span<const int>::iterator;
+
+    // A span views contiguous storage, so its iterator is a contiguous iterator
+    // (it advertises ztl::contiguous_iterator_tag) — and therefore satisfies
+    // every weaker tier as well.
+    static_assert(ztl::is_contiguous_iterator<mut_iter>::value, "span iterator is contiguous");
+    static_assert(ztl::is_random_access_iterator<mut_iter>::value, "span iterator is random-access");
+    static_assert(ztl::is_bidirectional_iterator<mut_iter>::value, "span iterator is bidirectional");
+    static_assert(ztl::is_forward_iterator<mut_iter>::value, "span iterator is forward");
+    static_assert(ztl::is_input_iterator<mut_iter>::value, "span iterator is input");
+    static_assert(ztl::is_contiguous_iterator<const_iter>::value, "const span iterator is contiguous");
+
+    // Writability follows element constness: span<int> writes, span<const int> does not.
+    static_assert(ztl::is_output_iterator<mut_iter, int>::value, "mutable span iterator is writable");
+    static_assert(!ztl::is_output_iterator<const_iter, int>::value, "const span iterator is not writable");
+
+    // Sentinels, including across cv-qualification (uses the kept cross-cv operator-).
+    static_assert(ztl::is_sized_sentinel_for<mut_iter, mut_iter>::value, "iterator is its own sized sentinel");
+    static_assert(ztl::is_sized_sentinel_for<const_iter, const_iter>::value,
+                  "const iterator is its own sized sentinel");
+    static_assert(ztl::is_sized_sentinel_for<const_iter, mut_iter>::value,
+                  "const iterator is a sized sentinel for the mutable iterator");
+    static_assert(ztl::is_sized_sentinel_for<mut_iter, const_iter>::value,
+                  "mutable iterator is a sized sentinel for the const iterator");
+
+    // Associated types resolve through the synthesised iterator_interface typedefs.
+    static_assert(std::is_same<ztl::iter_value_t<mut_iter>, int>::value, "iter_value_t is int");
+    static_assert(std::is_same<ztl::iter_reference_t<mut_iter>, int&>::value, "iter_reference_t is int&");
+    static_assert(std::is_same<ztl::iter_reference_t<const_iter>, const int&>::value,
+                  "const iter_reference_t is const int&");
+    static_assert(std::is_same<ztl::iter_difference_t<mut_iter>, std::ptrdiff_t>::value,
+                  "iter_difference_t is ptrdiff_t");
+
+    CHECK(ztl::is_contiguous_iterator<mut_iter>::value);
+    CHECK((ztl::is_sized_sentinel_for<const_iter, mut_iter>::value));
+    CHECK((ztl::is_output_iterator<mut_iter, int>::value));
+    CHECK_FALSE((ztl::is_output_iterator<const_iter, int>::value));
 }
 
 TEST_CASE_TEMPLATE("span reverse iterators traverse from back to front", Span, ztl::span<int, 5>, ztl::span<int>,

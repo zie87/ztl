@@ -6,7 +6,6 @@
 // (See accompanying LICENSE file or copy at
 // http://www.boost.org/LICENSE_1_0.txt)
 
-
 #ifndef ZTL_ITERATOR_HPP
 #define ZTL_ITERATOR_HPP
 

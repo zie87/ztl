@@ -119,8 +119,7 @@ private:
 
 // Proxy random-access iterator (the P2727 RepeatedChars example): capability is
 // random-access, category is downgraded to input.
-struct RepeatedChars
-    : ztl::proxy_iterator_interface<RepeatedChars, std::random_access_iterator_tag, char, char> {
+struct RepeatedChars : ztl::proxy_iterator_interface<RepeatedChars, std::random_access_iterator_tag, char, char> {
     RepeatedChars() : first_(nullptr), size_(0), n_(0) {}
     RepeatedChars(char const* first, difference_type size, difference_type n) : first_(first), size_(size), n_(n) {}
     char           operator*() const { return first_[n_ % size_]; }
@@ -174,12 +173,24 @@ private:
 struct EndSentinel {
     int stop;
 };
-inline bool operator==(Countdown i, EndSentinel s) { return i.value() == s.stop; }
-inline bool operator==(EndSentinel s, Countdown i) { return i.value() == s.stop; }
-inline bool operator!=(Countdown i, EndSentinel s) { return !(i == s); }
-inline bool operator!=(EndSentinel s, Countdown i) { return !(i == s); }
-inline int  operator-(EndSentinel s, Countdown i) { return s.stop - i.value(); }
-inline int  operator-(Countdown i, EndSentinel s) { return i.value() - s.stop; }
+inline bool operator==(Countdown i, EndSentinel s) {
+    return i.value() == s.stop;
+}
+inline bool operator==(EndSentinel s, Countdown i) {
+    return i.value() == s.stop;
+}
+inline bool operator!=(Countdown i, EndSentinel s) {
+    return !(i == s);
+}
+inline bool operator!=(EndSentinel s, Countdown i) {
+    return !(i == s);
+}
+inline int operator-(EndSentinel s, Countdown i) {
+    return s.stop - i.value();
+}
+inline int operator-(Countdown i, EndSentinel s) {
+    return i.value() - s.stop;
+}
 
 struct NotAnIterator {
     int x;
@@ -289,14 +300,12 @@ TEST_SUITE("iterator traits — proxy iterators use ITER_CONCEPT, not category")
     TEST_CASE("proxy forward iterator is classified forward by capability") {
         CHECK(is_forward_iterator<PairFirstIter>::value);
         // ...even though its std category is downgraded to input:
-        CHECK((std::is_same<std::iterator_traits<PairFirstIter>::iterator_category,
-                            std::input_iterator_tag>::value));
+        CHECK((std::is_same<std::iterator_traits<PairFirstIter>::iterator_category, std::input_iterator_tag>::value));
     }
 
     TEST_CASE("proxy random-access iterator is classified random-access by capability") {
         CHECK(is_random_access_iterator<RepeatedChars>::value);
-        CHECK((std::is_same<std::iterator_traits<RepeatedChars>::iterator_category,
-                            std::input_iterator_tag>::value));
+        CHECK((std::is_same<std::iterator_traits<RepeatedChars>::iterator_category, std::input_iterator_tag>::value));
     }
 }
 
