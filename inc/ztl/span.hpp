@@ -9,7 +9,7 @@
 #ifndef ZTL_SPAN_HPP
 #define ZTL_SPAN_HPP
 
-#include "ztl/iterator_interface.hpp"
+#include "ztl/iterator/iterator_interface.hpp"
 #include "ztl/type_traits.hpp"
 #include "ztl/memory.hpp"
 #include "ztl/assert.hpp"

@@ -1,42 +1,16 @@
-/**
- * @file iterator_interface.hpp
- * @brief C++14 / IAR-friendly CRTP adaptation of P2727R4 iterator_interface.
- *
- * This is intentionally not a direct transcription of P2727R4: C++14 has no
- * concepts, deducing-this, if constexpr, or operator<=>.  The public surface and
- * generated operations follow the proposal where this can be done without those
- * language facilities.
- *
- * IAR / embedded C++14 constraints:
- *   - No [[nodiscard]], if constexpr, deduced-this, concepts, or operator<=>
- *   - No std::void_t, std::conjunction, std::enable_if_t
- *   - No dynamic allocation, RTTI, or exceptions
- *
- * Typical direct iterator requirements:
- *
- *   input / forward:
- *       Reference  operator*()  const;
- *       Derived&   operator++();
- *       bool       operator==(Derived const&) const;
- *
- *   bidirectional (above plus):
- *       Derived&   operator--();
- *
- *   random_access:
- *       Reference       operator*()  const;
- *       Derived&        operator+=(DifferenceType);
- *       DifferenceType  operator-(Derived const&) const;
- *       // operator== may be provided explicitly; otherwise it can be
- *       // synthesized from operator-.
- *
- * Adapter support:
- *   A derived iterator may friend ztl::iterator_interface_access and provide
- *   base_reference() overloads.  Missing operator*, ++, --, +=, -, and == are
- *   then synthesized from the adapted base where possible.
- */
+// SPDX-License-Identifier: BSL-1.0
+//
+// Copyright (c) 2026 Tobias Zindl
+//
+// Distributed under the Boost Software License, Version 1.0.
+// (See accompanying LICENSE file or copy at
+// http://www.boost.org/LICENSE_1_0.txt)
 
 #ifndef ZTL_ITERATORINTERFACE_HPP
 #define ZTL_ITERATORINTERFACE_HPP
+
+#include "ztl/type_traits.hpp"
+#include "ztl/memory.hpp"
 
 #include <cstddef>
 #include <iterator>
@@ -80,21 +54,7 @@ private:
 
 namespace details {
 
-// -----------------------------------------------------------------------
-// C++14 utilities
-// -----------------------------------------------------------------------
-template <typename...>
-struct make_void {
-    typedef void type;
-};
 
-template <typename... Ts>
-using void_t = typename make_void<Ts...>::type;
-
-template <typename T>
-T* addressof(T& value) {
-    return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<char const volatile&>(value)));
-}
 
 template <typename Pointer, typename Reference, bool IsPointer>
 struct make_iterator_pointer_impl;
@@ -103,7 +63,7 @@ template <typename Pointer, typename Reference>
 struct make_iterator_pointer_impl<Pointer, Reference, true> {
     template <typename T>
     static Pointer call(T&& value) {
-        return details::addressof(value);
+        return ::ztl::addressof(value);
     }
 };
 
