@@ -10,6 +10,7 @@
 #ifndef ZTL_ITERATOR_HPP
 #define ZTL_ITERATOR_HPP
 
+#include "ztl/iterator/iterator_concepts.hpp"
 #include "ztl/iterator/iterator_interface.hpp"
 
 #endif // ZTL_ITERATOR_HPP

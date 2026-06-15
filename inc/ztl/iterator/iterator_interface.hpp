@@ -54,8 +54,6 @@ private:
 
 namespace details {
 
-
-
 template <typename Pointer, typename Reference, bool IsPointer>
 struct make_iterator_pointer_impl;
 
@@ -69,6 +67,10 @@ struct make_iterator_pointer_impl<Pointer, Reference, true> {
 
 template <typename Pointer, typename Reference>
 struct make_iterator_pointer_impl<Pointer, Reference, false> {
+    // Reached only when Pointer is a class type (e.g. a user-supplied smart
+    // pointer) *and* the arrow mixin is active, which requires Reference to be
+    // a language reference.  For proxy iterators Pointer is set to void and the
+    // arrow mixin is disabled, so this branch is never taken for them.
     template <typename T>
     static Pointer call(T&& value) {
         return Pointer(std::forward<T>(value));
@@ -135,6 +137,12 @@ struct has_base_equal<T, void_t<decltype(iterator_interface_access::base(std::de
                                          iterator_interface_access::base(std::declval<T const&>()))>> : std::true_type {
 };
 
+// has_member_equal detects a *member* operator==.  This is the documented
+// contract for adapting equality: a derived iterator that wants the synthesized
+// comparison/!= machinery suppressed must declare operator== as a member.  A
+// hidden-friend operator== is intentionally NOT detected here, because probing
+// for a free `a == b` at this point would also see the friend operators this
+// class template itself defines, which is self-referential.  Provide a member.
 template <typename T, typename = void>
 struct has_member_equal : std::false_type {};
 
@@ -177,15 +185,12 @@ public:
 };
 
 template <typename IteratorConcept>
-struct supported_concept {
-    enum {
-        value = std::is_same<IteratorConcept, std::output_iterator_tag>::value ||
-                std::is_base_of<std::input_iterator_tag, IteratorConcept>::value ||
-                std::is_base_of<std::forward_iterator_tag, IteratorConcept>::value ||
-                std::is_base_of<std::bidirectional_iterator_tag, IteratorConcept>::value ||
-                std::is_base_of<std::random_access_iterator_tag, IteratorConcept>::value
-    };
-};
+struct supported_concept
+    : bool_constant<std::is_same<IteratorConcept, std::output_iterator_tag>::value ||
+                    std::is_base_of<std::input_iterator_tag, IteratorConcept>::value ||
+                    std::is_base_of<std::forward_iterator_tag, IteratorConcept>::value ||
+                    std::is_base_of<std::bidirectional_iterator_tag, IteratorConcept>::value ||
+                    std::is_base_of<std::random_access_iterator_tag, IteratorConcept>::value> {};
 
 // -----------------------------------------------------------------------
 // iterator_category is present iff IteratorConcept is forward-or-better.
@@ -351,11 +356,14 @@ struct iter_ops<D, DiffT, Ref, std::random_access_iterator_tag> {
 
     // [] from + and *; returns exactly whatever * returns.
     // Note: uses explicit return type instead of decltype(auto) for IAR C++14 compatibility.
-    constexpr Ref operator[](DiffT n) const {
-        D tmp = static_cast<D const&>(*this);
-        tmp   = tmp + n;
-        return *tmp;
-    }
+    //
+    // Contract: like every random-access iterator, *this must dereference to a
+    // reference into a stable backing store, not into the iterator object.  The
+    // temporary built by (*this + n) is destroyed at the end of the return
+    // statement, so a "stashing" iterator whose operator* hands back a reference
+    // to its own state would dangle here.  Such an iterator does not model
+    // random_access and must not derive a random-access interface.
+    constexpr Ref operator[](DiffT n) const { return *(static_cast<D const&>(*this) + n); }
 
     friend constexpr D operator+(D it, DiffT n) {
         it += n;
