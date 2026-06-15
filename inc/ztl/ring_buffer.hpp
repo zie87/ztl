@@ -9,7 +9,7 @@
 #ifndef ZTL_RINGBUFFER_HPP
 #define ZTL_RINGBUFFER_HPP
 
-#include "ztl/iterator_interface.hpp"
+#include "ztl/iterator/iterator_interface.hpp"
 #include "ztl/details/raw_storage.hpp"
 #include "ztl/type_traits.hpp"
 #include "ztl/assert.hpp"

@@ -54,6 +54,11 @@ constexpr auto to_address(const Ptr& p) noexcept -> decltype(details::to_address
     return details::to_address_impl(p, details::priority_tag<2>{});
 }
 
+template <typename T>
+T* addressof(T& value) {
+    return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<char const volatile&>(value)));
+}
+  
 } // namespace ztl
 
 #endif // ZTL_MEMORY_HPP

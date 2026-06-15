@@ -1,17 +1,4 @@
-/**
- * @file test_iterator_interface.cpp
- * @brief doctest test suite for iterator_interface (C++14 / IAR)
- *
- * Build (host GCC/Clang):
- *   g++ -std=c++14 -Wall -Wextra -pedantic -I. \
- *       test_iterator_interface.cpp -o test_iter && ./test_iter -v
- *
- * Build (IAR EWARM):
- *   iccarm --c++ --cpp_dialect c++14 --no_exceptions --no_rtti \
- *          -I. test_iterator_interface.cpp -o test_iter.o
- */
-
-#include "ztl/iterator_interface.hpp"
+#include "ztl/iterator.hpp"
 
 #include <doctest/doctest.h>
 
