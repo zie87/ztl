@@ -1,5 +1,7 @@
 #include "ztl/ring_buffer.hpp"
 
+#include "ztl/iterator/iterator_concepts.hpp"
+
 #include "doctest/doctest.h"
 
 #include <algorithm>
@@ -1332,6 +1334,55 @@ TEST_CASE_TEMPLATE("iterator exposes mutable random-access behavior", T, int, st
     CHECK((buffer[2] == T(5)));
     CHECK((buffer[3] == T(60)));
     CHECK((buffer[4] == T(7)));
+}
+
+TEST_CASE_TEMPLATE("iterator satisfies the ztl iterator concept traits", T, int, std::uint16_t, small_value,
+                   wide_value) {
+    typedef ztl::ring_buffer<T, 5>               buffer_type;
+    typedef typename buffer_type::iterator       iterator;
+    typedef typename buffer_type::const_iterator const_iterator;
+
+    // Tier: random-access, and therefore every weaker tier as well.
+    static_assert(ztl::is_random_access_iterator<iterator>::value, "iterator is random-access");
+    static_assert(ztl::is_bidirectional_iterator<iterator>::value, "iterator is bidirectional");
+    static_assert(ztl::is_forward_iterator<iterator>::value, "iterator is forward");
+    static_assert(ztl::is_input_iterator<iterator>::value, "iterator is input");
+    static_assert(ztl::is_iterator<iterator>::value, "iterator is an iterator");
+    static_assert(ztl::is_random_access_iterator<const_iterator>::value, "const_iterator is random-access");
+
+    // A ring buffer wraps around, so its iterator is deliberately NOT contiguous:
+    // it advertises random_access_iterator_tag, not ztl::contiguous_iterator_tag.
+    static_assert(!ztl::is_contiguous_iterator<iterator>::value, "ring iterator is not contiguous");
+    static_assert(!ztl::is_contiguous_iterator<const_iterator>::value, "const ring iterator is not contiguous");
+
+    // Writability: the mutable iterator is an output iterator for T, the const one is not.
+    static_assert(ztl::is_output_iterator<iterator, T>::value, "mutable iterator is writable");
+    static_assert(!ztl::is_output_iterator<const_iterator, T>::value, "const iterator is not writable");
+
+    // Sentinels: each iterator is a sized sentinel for itself, and the cross-const
+    // subtraction makes the two constness variants sized sentinels for each other.
+    static_assert(ztl::is_sentinel_for<iterator, iterator>::value, "iterator is its own sentinel");
+    static_assert(ztl::is_sized_sentinel_for<iterator, iterator>::value, "iterator is its own sized sentinel");
+    static_assert(ztl::is_sized_sentinel_for<const_iterator, const_iterator>::value,
+                  "const_iterator is its own sized sentinel");
+    static_assert(ztl::is_sized_sentinel_for<const_iterator, iterator>::value,
+                  "const_iterator is a sized sentinel for iterator");
+    static_assert(ztl::is_sized_sentinel_for<iterator, const_iterator>::value,
+                  "iterator is a sized sentinel for const_iterator");
+
+    // The associated types resolve through the synthesised iterator_interface typedefs.
+    static_assert(std::is_same<ztl::iter_value_t<iterator>, T>::value, "iter_value_t is T");
+    static_assert(std::is_same<ztl::iter_reference_t<iterator>, T&>::value, "iter_reference_t is T&");
+    static_assert(std::is_same<ztl::iter_reference_t<const_iterator>, const T&>::value,
+                  "const iter_reference_t is const T&");
+    static_assert(std::is_same<ztl::iter_difference_t<iterator>, std::ptrdiff_t>::value,
+                  "iter_difference_t is ptrdiff_t");
+
+    // Surface a few of these at runtime too so they register as assertions.
+    CHECK(ztl::is_random_access_iterator<iterator>::value);
+    CHECK_FALSE(ztl::is_contiguous_iterator<iterator>::value);
+    CHECK((ztl::is_sized_sentinel_for<const_iterator, iterator>::value));
+    CHECK((ztl::is_output_iterator<iterator, T>::value));
 }
 
 TEST_CASE_TEMPLATE("iterator pre/post increment and decrement move one logical position", T, int, std::uint16_t,
