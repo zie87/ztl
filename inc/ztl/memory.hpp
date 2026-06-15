@@ -54,11 +54,29 @@ constexpr auto to_address(const Ptr& p) noexcept -> decltype(details::to_address
     return details::to_address_impl(p, details::priority_tag<2>{});
 }
 
+// std::addressof is constexpr (since C++17) and noexcept; we match that here.
+// The reinterpret_cast idiom cannot appear in a constant expression, so we use
+// the compiler builtin when one is available (it is on GCC, Clang and IAR) and
+// only fall back to the cast otherwise. The fallback is still noexcept; it just
+// is not usable in a constant expression.
+#if defined(__has_builtin)
+#if __has_builtin(__builtin_addressof)
+#define ZTL_HAS_BUILTIN_ADDRESSOF 1
+#endif
+#endif
+
+#ifdef ZTL_HAS_BUILTIN_ADDRESSOF
 template <typename T>
-T* addressof(T& value) {
+constexpr T* addressof(T& value) noexcept {
+    return __builtin_addressof(value);
+}
+#else
+template <typename T>
+T* addressof(T& value) noexcept {
     return reinterpret_cast<T*>(&const_cast<char&>(reinterpret_cast<char const volatile&>(value)));
 }
-  
+#endif
+
 } // namespace ztl
 
 #endif // ZTL_MEMORY_HPP

@@ -12,6 +12,7 @@ ztl_test_exe = executable(
         'ztl/functional/function_ref_tests.cpp',
         'ztl/hash_tests.cpp',
         'ztl/iterator/iterator_interface_tests.cpp',
+        'ztl/iterator/iterator_concepts_tests.cpp',
         'ztl/ring_buffer_tests.cpp',
         'ztl/serialize_tests.cpp',
         'ztl/span_tests.cpp',
