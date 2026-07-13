@@ -49,5 +49,5 @@ SpacesBeforeTrailingComments: 1
 AlignAfterOpenBracket: Align
 AlignOperands: true
 
-CompactNamespaces: false
-FixNamespaceComments: false
+CompactNamespaces: true
+FixNamespaceComments: true
