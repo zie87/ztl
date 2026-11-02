@@ -9,6 +9,8 @@
 #ifndef ZTL_UTILITY_NONTYPE_HPP
 #define ZTL_UTILITY_NONTYPE_HPP
 
+#include <type_traits>
+
 namespace ztl {
 
 // C++14 replacement for C++17 template<auto V> nontype_t<V>.

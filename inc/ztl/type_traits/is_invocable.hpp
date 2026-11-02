@@ -10,6 +10,10 @@
 #define ZTL_TYPETRAITS_ISINVOCABLE_HPP
 
 #include "ztl/functional/invoke.hpp"
+#include "ztl/type_traits.hpp"
+
+#include <type_traits>
+#include <utility>
 
 namespace ztl {
 namespace details {

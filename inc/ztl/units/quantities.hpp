@@ -1,7 +1,11 @@
 #ifndef ZTL_UNITS_QUANTITIES_HPP
 #define ZTL_UNITS_QUANTITIES_HPP
 
+#include "ztl/units/basic_unit.hpp"
+#include "ztl/units/unit_trait.hpp"
 #include "ztl/narrow.hpp"
+
+#include <ratio>
 
 namespace ztl {
 namespace units {
