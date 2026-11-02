@@ -39,6 +39,8 @@ template <class T>
 using remove_cvref_t = typename remove_cvref<T>::type;
 } // namespace ztl
 
+// NOTE: must stay below the definitions above; is_invocable.hpp includes this
+// header for void_t, which only works because void_t is already defined here.
 #include "ztl/type_traits/is_invocable.hpp"
 
 #endif // ZTL_TYPETRAITS_HPP
