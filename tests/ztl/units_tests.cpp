@@ -874,3 +874,45 @@ TEST_CASE("unit_cast between angle units is not rounded by the rep width") {
     CHECK(ztl::units::unit_cast<ztl::units::microdegree>(ztl::units::radian(1)).count() == 57295779);
     CHECK(ztl::units::unit_cast<ztl::units::degree>(ztl::units::radian(57)).count() == 3265);
 }
+
+// ============================================================================
+//  unit_cast must not overflow in the intermediate product
+// ============================================================================
+
+TEST_CASE("unit_cast does not overflow when the intermediate product exceeds intmax_t") {
+    // radian -> microdegree multiplies by 3.6e17 before dividing by 6283185307
+    CHECK(ztl::units::unit_cast<ztl::units::microdegree>(ztl::units::radian(26)).count() == 1489690267);
+    CHECK(ztl::units::unit_cast<ztl::units::microdegree>(ztl::units::radian(37)).count() == 2119943842);
+    CHECK(ztl::units::unit_cast<ztl::units::microdegree>(ztl::units::radian(-37)).count() == -2119943842);
+    CHECK(ztl::units::unit_cast<ztl::units::millidegree>(ztl::units::radian(30000)).count() == 1718873385);
+
+    static_assert(ztl::units::unit_cast<ztl::units::microdegree>(ztl::units::radian(30)).count() == 1718873385,
+                  "the wide path must stay usable in constant expressions");
+}
+
+TEST_CASE("unit_cast handles 64-bit reps whose product needs more than 64 bits") {
+    using mps_i64 = ztl::units::speed<std::int64_t>;
+    using kmh_i64 = ztl::units::speed<std::int64_t, std::ratio<5, 18>>;
+
+    // * 18 overflows int64, / 5 brings the result back into range
+    CHECK(ztl::units::unit_cast<kmh_i64>(mps_i64(2305843009213693951)).count() == 8301034833169298223);
+    CHECK(ztl::units::unit_cast<kmh_i64>(mps_i64(-2305843009213693951)).count() == -8301034833169298223);
+}
+
+TEST_CASE("unit_cast handles unsigned 64-bit values above INT64_MAX") {
+    using nanovolt_u64 = ztl::units::voltage<std::uint64_t, std::nano>;
+    using volt_u64     = ztl::units::voltage<std::uint64_t>;
+
+    CHECK(ztl::units::unit_cast<volt_u64>(nanovolt_u64(std::numeric_limits<std::uint64_t>::max())).count() ==
+          18446744073u);
+}
+
+TEST_CASE("unit_cast with an offset does not overflow for large 64-bit values") {
+    using fahrenheit_i64 = ztl::units::temperature<std::int64_t, std::ratio<5, 9>,
+                                                   ztl::units::offset_trait<-2298350, std::ratio<1, 9000>>>;
+    using kelvin_i64 = ztl::units::temperature<std::int64_t>;
+
+    // the old common-denominator form multiplied the value by 5000
+    CHECK(ztl::units::unit_cast<kelvin_i64>(fahrenheit_i64(10000000000000000)).count() == 5555555555555810);
+    CHECK(ztl::units::unit_cast<kelvin_i64>(fahrenheit_i64(-10000000000000000)).count() == -5555555555555300);
+}

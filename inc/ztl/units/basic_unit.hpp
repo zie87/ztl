@@ -12,6 +12,7 @@
 #include "ztl/units/ratio.hpp"
 #include "ztl/units/unit_trait.hpp"
 #include "ztl/numeric.hpp"
+#include "ztl/details/uint128.hpp"
 
 #include <numeric>
 #include <type_traits>
@@ -71,30 +72,6 @@ struct is_lossless<TARGET_T, SOURCE_T,
 
 namespace details {
 // --- promote-to-bigger type (portable, no per-type specializations) ----------
-// --- overflow detection (handles both signed and unsigned) --------------------
-template <std::intmax_t FACTOR, typename T>
-constexpr bool would_overflow_positive(T val) {
-    return (FACTOR > std::numeric_limits<T>::max()) ||
-           (val > static_cast<T>(0) && val > std::numeric_limits<T>::max() / static_cast<T>(FACTOR));
-}
-
-template <std::intmax_t FACTOR, typename T>
-constexpr bool would_overflow_negative(T val, std::true_type /*is_signed*/) {
-    return val < static_cast<T>(0) && val < std::numeric_limits<T>::min() / static_cast<T>(FACTOR);
-}
-
-template <std::intmax_t, typename T>
-constexpr bool would_overflow_negative(T, std::false_type /*unsigned*/) {
-    return false;
-}
-
-template <std::intmax_t FACTOR, typename T>
-constexpr bool would_overflow(T val) {
-    return (FACTOR == 0 || FACTOR == 1)
-               ? false
-               : would_overflow_positive<FACTOR>(val) || would_overflow_negative<FACTOR>(val, std::is_signed<T>{});
-}
-
 //     Picks the next-wider standard integer.  At max width, stays put.
 template <std::size_t SIZE, bool SIGNED>
 struct bigger_by_size;
@@ -138,19 +115,95 @@ struct bigger_by_size<8, true> {
 template <typename T>
 using bigger_type_t = typename bigger_by_size<sizeof(T), std::is_signed<T>::value>::type;
 
-template <typename R1, typename R2, typename R3>
-struct ratio_common_denominator {
-    static constexpr std::intmax_t value = ::ztl::lcm(::ztl::lcm(R1::den, R2::den), R3::den);
+// --- exact affine scaling: result = (val * FACTOR + OFFSET) / DEN ------------
+//     FACTOR, OFFSET and DEN are compile-time constants derived from the units.
+//     When val * FACTOR + OFFSET fits into intmax_t the plain arithmetic is used;
+//     otherwise the product is formed in 128 bits so that no intermediate value
+//     overflows. The quotient is truncated toward zero in both paths.
+constexpr bool intmax_mul_fits(std::intmax_t a, std::intmax_t b) noexcept {
+    return a == 0 || b == 0 ||
+           ::ztl::details::abs_val(a) <= std::numeric_limits<std::intmax_t>::max() / ::ztl::details::abs_val(b);
+}
+
+template <typename SCALE, typename OFFSET>
+struct affine_constants {
+    static_assert(sizeof(std::intmax_t) == sizeof(std::uint64_t), "unit_cast assumes a 64-bit intmax_t");
+
+    static constexpr std::intmax_t den_gcd = ::ztl::gcd(SCALE::den, OFFSET::den);
+    static_assert(intmax_mul_fits(SCALE::den / den_gcd, OFFSET::den),
+                  "unit_cast: the common denominator of scale and offset does not fit into intmax_t");
+    static constexpr std::intmax_t den = SCALE::den / den_gcd * OFFSET::den;
+
+    static_assert(intmax_mul_fits(SCALE::num, den / SCALE::den),
+                  "unit_cast: the scale factor does not fit into intmax_t");
+    static_assert(intmax_mul_fits(OFFSET::num, den / OFFSET::den), "unit_cast: the offset does not fit into intmax_t");
+    static constexpr std::intmax_t factor = SCALE::num * (den / SCALE::den);
+    static constexpr std::intmax_t offset = OFFSET::num * (den / OFFSET::den);
 };
 
-template <typename SCALE, typename TARGET_OFFSET_SCALE, typename SOURCE_OFFSET_SCALE, typename T>
-constexpr T ratio_affine_scale(T val, std::intmax_t target_offset, std::intmax_t source_offset) {
-    constexpr std::intmax_t den = ratio_common_denominator<SCALE, TARGET_OFFSET_SCALE, SOURCE_OFFSET_SCALE>::value;
+template <typename T>
+constexpr std::uint64_t magnitude(T val, std::true_type /*is_signed*/) noexcept {
+    return val < 0 ? std::uint64_t{0} - static_cast<std::uint64_t>(val) : static_cast<std::uint64_t>(val);
+}
 
-    return static_cast<T>((static_cast<std::intmax_t>(val) * SCALE::num * (den / SCALE::den) +
-                           target_offset * TARGET_OFFSET_SCALE::num * (den / TARGET_OFFSET_SCALE::den) -
-                           source_offset * SOURCE_OFFSET_SCALE::num * (den / SOURCE_OFFSET_SCALE::den)) /
-                          den);
+template <typename T>
+constexpr std::uint64_t magnitude(T val, std::false_type /*is_signed*/) noexcept {
+    return static_cast<std::uint64_t>(val);
+}
+
+template <typename T>
+constexpr std::uint64_t magnitude(T val) noexcept {
+    return magnitude(val, std::is_signed<T>{});
+}
+
+// Converts sign + magnitude to REP. Exact whenever the value is representable;
+// out-of-range values wrap like a static_cast from intmax_t would.
+template <typename REP>
+constexpr REP from_sign_magnitude(bool negative, std::uint64_t mag) noexcept {
+    return !negative ? static_cast<REP>(mag)
+           : mag <= static_cast<std::uint64_t>(std::numeric_limits<std::intmax_t>::max())
+               ? static_cast<REP>(-static_cast<std::intmax_t>(mag))
+               : static_cast<REP>(static_cast<std::intmax_t>(std::uint64_t{0} - mag));
+}
+
+template <std::intmax_t FACTOR_V, std::intmax_t OFFSET_V, std::intmax_t DEN_V, typename REP, typename T>
+constexpr REP affine_scale_wide(T val) noexcept {
+    const std::uint64_t offset_mag = magnitude(OFFSET_V);
+    const bool          offset_neg = OFFSET_V < 0;
+
+    const ::ztl::details::uint128 product     = ::ztl::details::uint128_mul(magnitude(val), magnitude(FACTOR_V));
+    const bool                    product_neg = (val < T{0}) != (FACTOR_V < 0);
+
+    // sum = product (+/-) offset, kept as sign + magnitude
+    bool                    sum_neg = product_neg;
+    ::ztl::details::uint128 sum     = product;
+    if (product.hi == 0u && product.lo == 0u) {
+        sum_neg = offset_neg;
+        sum     = ::ztl::details::uint128{0u, offset_mag};
+    } else if (product_neg == offset_neg) {
+        sum = ::ztl::details::uint128_add(product, offset_mag);
+    } else if (::ztl::details::uint128_less(product, offset_mag)) {
+        sum_neg = offset_neg;
+        sum     = ::ztl::details::uint128{0u, offset_mag - product.lo};
+    } else {
+        sum = ::ztl::details::uint128_sub(product, offset_mag);
+    }
+
+    const ::ztl::details::uint128 quotient =
+        (DEN_V == 1) ? sum : ::ztl::details::uint128_div(sum, static_cast<std::uint64_t>(DEN_V));
+    return from_sign_magnitude<REP>(sum_neg, quotient.lo);
+}
+
+template <std::intmax_t FACTOR_V, std::intmax_t OFFSET_V, std::intmax_t DEN_V, typename REP, typename T>
+constexpr REP affine_scale(T val) noexcept {
+    // largest |val| for which val * FACTOR + OFFSET cannot overflow intmax_t
+    constexpr std::uint64_t narrow_limit =
+        (static_cast<std::uint64_t>(std::numeric_limits<std::intmax_t>::max()) - magnitude(OFFSET_V)) /
+        magnitude(FACTOR_V);
+
+    return magnitude(val) <= narrow_limit
+               ? static_cast<REP>((static_cast<std::intmax_t>(val) * FACTOR_V + OFFSET_V) / DEN_V)
+               : affine_scale_wide<FACTOR_V, OFFSET_V, DEN_V, REP>(val);
 }
 
 } // namespace details
@@ -160,7 +213,6 @@ constexpr typename std::enable_if<is_unit<TARGET_T>::value && is_unit<SOURCE_T>:
                                       std::is_same<quantity_of_t<TARGET_T>, quantity_of_t<SOURCE_T>>::value,
                                   TARGET_T>::type
 unit_cast(const SOURCE_T& v) {
-    using source_rep = typename SOURCE_T::rep;
     using target_rep = typename TARGET_T::rep;
 
     using source_unit_trait = unit_trait_of_t<SOURCE_T>;
@@ -169,29 +221,20 @@ unit_cast(const SOURCE_T& v) {
     using source_ratio = ratio_of_t<source_unit_trait>;
     using target_ratio = ratio_of_t<target_unit_trait>;
 
-    // NOTE: the exact ratio must be used here. The arithmetic runs in intmax_t,
-    // so the width of target_rep says nothing about how wide the ratio may be.
+    // NOTE: the exact ratio must be used here. The arithmetic does not depend on
+    // the width of target_rep, so that width says nothing about how wide the ratio may be.
     using scale = std::ratio_divide<source_ratio, target_ratio>;
 
-    using source_offset_ratio = typename offset_of_t<source_unit_trait>::ratio_type;
-    using target_offset_ratio = typename offset_of_t<target_unit_trait>::ratio_type;
+    using source_offset_scale = std::ratio_divide<typename offset_of_t<source_unit_trait>::ratio_type, target_ratio>;
+    using target_offset_scale = std::ratio_divide<typename offset_of_t<target_unit_trait>::ratio_type, target_ratio>;
 
-    using source_offset_scale = std::ratio_divide<source_offset_ratio, target_ratio>;
-    using target_offset_scale = std::ratio_divide<target_offset_ratio, target_ratio>;
+    // target = source * scale + (target_offset * target_offset_scale - source_offset * source_offset_scale)
+    using offset = std::ratio_subtract<
+        std::ratio_multiply<std::ratio<offset_value_of<target_unit_trait>::value>, target_offset_scale>,
+        std::ratio_multiply<std::ratio<offset_value_of<source_unit_trait>::value>, source_offset_scale>>;
 
-    using common     = typename std::common_type<source_rep, target_rep>::type;
-    const common val = static_cast<common>(v.count());
-
-    // fast path: no risk of overflow
-    return (scale::num == 1 || !details::would_overflow<scale::num>(val))
-               ? TARGET_T(static_cast<target_rep>(
-                     details::ratio_affine_scale<scale, target_offset_scale, source_offset_scale>(
-                         val, offset_value_of<target_unit_trait>::value, offset_value_of<source_unit_trait>::value)))
-               // slow path: promote to wider type
-               : TARGET_T(static_cast<target_rep>(
-                     details::ratio_affine_scale<scale, target_offset_scale, source_offset_scale>(
-                         static_cast<details::bigger_type_t<common>>(val), offset_value_of<target_unit_trait>::value,
-                         offset_value_of<source_unit_trait>::value)));
+    using constants = details::affine_constants<scale, offset>;
+    return TARGET_T(details::affine_scale<constants::factor, constants::offset, constants::den, target_rep>(v.count()));
 }
 
 template <typename REP, typename UNIT>
