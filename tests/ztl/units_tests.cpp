@@ -844,3 +844,33 @@ TEST_CASE("speed mixed arithmetic regression") {
     CHECK(mixed_speed.count() == 180);
     CHECK(ztl::units::unit_cast<ztl::units::meter_per_second>(mixed_speed).count() == 10);
 }
+
+// ============================================================================
+//  unit_cast must use the exact conversion ratio, independent of target width
+// ============================================================================
+
+TEST_CASE("unit_cast into a narrow rep keeps the exact ratio") {
+    using millivolt_u16 = ztl::units::voltage<std::uint16_t, std::milli>;
+    using volt_i8       = ztl::units::voltage<std::int8_t>;
+    using microvolt_u32 = ztl::units::voltage<std::uint32_t, std::micro>;
+
+    // 1/1000 used to be shifted down to 0/250, so every result became 0
+    CHECK(ztl::units::unit_cast<volt_i8>(millivolt_u16(65535)).count() == 65);
+    CHECK(ztl::units::unit_cast<volt_i8>(millivolt_u16(999)).count() == 0);
+    CHECK(ztl::units::unit_cast<volt_i8>(microvolt_u32(127000000)).count() == 127);
+}
+
+TEST_CASE("unit_cast into a narrow rep compiles for ratios wider than the rep") {
+    using nanovolt_i8 = ztl::units::voltage<std::int8_t, std::nano>;
+
+    // 1e9/1 used to be shifted down to 238/0, which tripped a static_assert
+    CHECK(ztl::units::unit_cast<nanovolt_i8>(ztl::units::volt(0)).count() == 0);
+    CHECK(ztl::units::unit_cast<nanovolt_i8>(ztl::units::kilovolt(0)).count() == 0);
+}
+
+TEST_CASE("unit_cast between angle units is not rounded by the rep width") {
+    // radian -> microdegree has a 59-bit numerator; trimming it to 32 bits
+    // produced 58308891 (≈1.8 % off) instead of 57295779
+    CHECK(ztl::units::unit_cast<ztl::units::microdegree>(ztl::units::radian(1)).count() == 57295779);
+    CHECK(ztl::units::unit_cast<ztl::units::degree>(ztl::units::radian(57)).count() == 3265);
+}
