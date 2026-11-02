@@ -21,9 +21,14 @@
 
 namespace ztl {
 using byte = std::byte;
+using std::to_integer;
 
 static_assert(sizeof(ztl::byte) == 1 && alignof(ztl::byte) == 1, "ztl::byte must be a true byte type");
 } // namespace ztl
+
+// NOTE: the bitwise operators for std::byte live in namespace std and are found
+// via ADL. They must not be redeclared in ztl, otherwise every unqualified use
+// inside ztl (or after `using namespace ztl`) is ambiguous.
 
 #else
 
@@ -37,19 +42,10 @@ namespace ztl {
 enum struct byte : std::uint8_t {};
 static_assert(sizeof(ztl::byte) == 1 && alignof(ztl::byte) == 1, "ztl::byte must be a true byte type");
 // clang-format on
-} // namespace ztl
-
-#endif
-
-namespace ztl {
 
 template <typename T, std::enable_if_t<std::is_integral<T>::value, bool> = true>
 constexpr T to_integer(byte b) noexcept {
     return static_cast<T>(b);
-}
-
-static inline constexpr auto to_byte(std::uint8_t value) noexcept -> byte {
-    return static_cast<ztl::byte>(value);
 }
 
 template <typename T, std::enable_if_t<std::is_integral<T>::value, bool> = true>
@@ -98,6 +94,16 @@ constexpr byte& operator^=(byte& l, byte r) noexcept {
 
 constexpr byte operator~(byte b) noexcept {
     return byte(static_cast<std::uint8_t>(~to_underlying(b)));
+}
+
+} // namespace ztl
+
+#endif
+
+namespace ztl {
+
+static inline constexpr auto to_byte(std::uint8_t value) noexcept -> byte {
+    return static_cast<ztl::byte>(value);
 }
 
 namespace details {
