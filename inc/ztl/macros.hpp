@@ -29,8 +29,12 @@ constexpr const char* file_basename(const char* path) noexcept {
 #define ZTL_FUNC __func__
 #define ZTL_FILE_BASENAME (::ztl::details::file_basename(ZTL_FILE))
 
+// NOTE: Clang reports [[nodiscard]] as available in C++14 mode but warns that
+// using it there is a C++17 extension, so before C++17 its own equivalent is used.
 #ifndef ZTL_NODISCARD
-#if defined(__has_cpp_attribute)
+#if defined(__clang__) && (__cplusplus < 201703L)
+#define ZTL_NODISCARD [[clang::warn_unused_result]]
+#elif defined(__has_cpp_attribute)
 #if __has_cpp_attribute(nodiscard) >= 201603
 #define ZTL_NODISCARD [[nodiscard]]
 #else

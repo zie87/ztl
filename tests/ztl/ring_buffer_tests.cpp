@@ -1592,3 +1592,20 @@ TEST_CASE("numeric algorithms work with mutable iterator ranges") {
 
     CHECK(std::accumulate(buffer.begin(), buffer.end(), 0) == 15);
 }
+
+TEST_CASE("iterator converts implicitly to const_iterator, but not the other way") {
+    using buffer_type = ztl::ring_buffer<int, 3>;
+    static_assert(std::is_convertible<buffer_type::iterator, buffer_type::const_iterator>::value,
+                  "iterator must convert to const_iterator");
+    static_assert(!std::is_convertible<buffer_type::const_iterator, buffer_type::iterator>::value,
+                  "const_iterator must not convert to iterator");
+
+    buffer_type buffer;
+    CHECK(buffer.try_push_back(1));
+    CHECK(buffer.try_push_back(2));
+
+    buffer_type::const_iterator first = buffer.begin();
+    CHECK(*first == 1);
+    CHECK(first == buffer.cbegin());
+    CHECK(buffer.end() - first == 2);
+}

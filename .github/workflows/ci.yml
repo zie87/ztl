@@ -1,0 +1,188 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # UBSan only prints by default; make every finding fail the test run.
+  UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+  ASAN_OPTIONS: halt_on_error=1:detect_leaks=1
+
+jobs:
+  build:
+    name: ${{ matrix.compiler }} ${{ matrix.buildtype }} ${{ matrix.std }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        buildtype: [release, debug]
+        std: [c++14, c++17, c++20]
+        include:
+          - compiler: gcc
+            cc: gcc
+            cxx: g++
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Meson and Ninja
+        run: pip install meson==1.5.2 ninja==1.11.1.1
+
+      - name: Cache Meson subproject downloads
+        uses: actions/cache@v4
+        with:
+          path: subprojects/packagecache
+          key: subprojects-${{ hashFiles('subprojects/*.wrap') }}
+
+      - name: Show compiler
+        run: $CXX --version
+
+      - name: Configure
+        run: meson setup build -Dwerror=true --buildtype ${{ matrix.buildtype }} -Dcpp_std=${{ matrix.std }}
+
+      - name: Build
+        run: meson compile -C build
+
+      - name: Test
+        run: meson test -C build --print-errorlogs
+
+      - name: Upload test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testlog-${{ matrix.compiler }}-${{ matrix.buildtype }}-${{ matrix.std }}
+          path: build/meson-logs/
+
+  sanitize:
+    name: ${{ matrix.compiler }} sanitizers (address, undefined)
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - compiler: gcc
+            cc: gcc
+            cxx: g++
+            extra_args: ""
+          # Clang's sanitizer runtime is linked at load time, so undefined
+          # symbols must be allowed while linking.
+          - compiler: clang
+            cc: clang
+            cxx: clang++
+            extra_args: -Db_lundef=false
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Meson and Ninja
+        run: pip install meson==1.5.2 ninja==1.11.1.1
+
+      - name: Cache Meson subproject downloads
+        uses: actions/cache@v4
+        with:
+          path: subprojects/packagecache
+          key: subprojects-${{ hashFiles('subprojects/*.wrap') }}
+
+      - name: Show compiler
+        run: $CXX --version
+
+      - name: Configure
+        run: meson setup build -Dwerror=true --buildtype debug -Db_sanitize=address,undefined ${{ matrix.extra_args }}
+
+      - name: Build
+        run: meson compile -C build
+
+      - name: Test
+        run: meson test -C build --print-errorlogs
+
+      - name: Upload test log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: testlog-${{ matrix.compiler }}-sanitize
+          path: build/meson-logs/
+
+  coverage:
+    name: gcc coverage
+    runs-on: ubuntu-24.04
+    env:
+      CC: gcc
+      CXX: g++
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Meson, Ninja and gcovr
+        run: pip install meson==1.5.2 ninja==1.11.1.1 gcovr==8.2
+
+      - name: Cache Meson subproject downloads
+        uses: actions/cache@v4
+        with:
+          path: subprojects/packagecache
+          key: subprojects-${{ hashFiles('subprojects/*.wrap') }}
+
+      - name: Show compiler
+        run: $CXX --version && gcov --version | head -n 1
+
+      - name: Configure
+        run: meson setup build -Dwerror=true --buildtype debug -Db_coverage=true
+
+      - name: Build
+        run: meson compile -C build
+
+      - name: Test
+        run: meson test -C build --print-errorlogs
+
+      # The report targets are run one at a time; running them in a single
+      # ninja call lets the gcovr invocations race each other.
+      - name: Generate coverage reports
+        run: |
+          ninja -C build coverage-html
+          ninja -C build coverage-xml
+          ninja -C build coverage-text
+
+      - name: Coverage summary
+        run: |
+          {
+            echo '### Coverage'
+            echo '```'
+            cat build/meson-logs/coverage.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            build/meson-logs/coveragereport/
+            build/meson-logs/coverage.xml
+            build/meson-logs/coverage.txt

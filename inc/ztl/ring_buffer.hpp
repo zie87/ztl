@@ -347,6 +347,11 @@ public:
 
         iterator_impl() noexcept : m_ring{nullptr}, m_idx{0} {}
 
+        // iterator -> const_iterator (a converting constructor rather than a
+        // conversion operator, so const_iterator never declares a conversion to itself)
+        template <bool C, typename std::enable_if<IS_CONST && !C, int>::type = 0>
+        iterator_impl(const iterator_impl<C>& other) noexcept : m_ring{other.m_ring}, m_idx{other.m_idx} {}
+
         reference operator*() const noexcept {
             ZTL_EXPECTS(m_ring != nullptr);
             ZTL_EXPECTS(m_idx >= 0);
@@ -368,11 +373,6 @@ public:
         template <bool C>
         bool operator==(const iterator_impl<C>& rhs) const noexcept {
             return (m_ring == rhs.m_ring) && (m_idx == rhs.m_idx);
-        }
-
-        template <bool B = IS_CONST, typename std::enable_if<!B, int>::type = 0>
-        operator iterator_impl<true>() const noexcept {
-            return iterator_impl<true>{m_ring, m_idx};
         }
 
     private:
