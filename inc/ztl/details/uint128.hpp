@@ -50,8 +50,13 @@ constexpr bool uint128_less(uint128 a, std::uint64_t b) noexcept {
     return a.hi == 0u && a.lo < b;
 }
 
-// Truncating division; the caller guarantees d != 0.
-constexpr uint128 uint128_div(uint128 n, std::uint64_t d) noexcept {
+struct uint128_divmod_result {
+    uint128       quotient;
+    std::uint64_t remainder;
+};
+
+// Truncating division with remainder; the caller guarantees d != 0.
+constexpr uint128_divmod_result uint128_divmod(uint128 n, std::uint64_t d) noexcept {
     uint128       q{n.hi / d, 0u};
     std::uint64_t r = n.hi % d;
 
@@ -64,7 +69,12 @@ constexpr uint128 uint128_div(uint128 n, std::uint64_t d) noexcept {
             q.lo |= std::uint64_t{1} << bit;
         }
     }
-    return q;
+    return uint128_divmod_result{q, r};
+}
+
+// Truncating division; the caller guarantees d != 0.
+constexpr uint128 uint128_div(uint128 n, std::uint64_t d) noexcept {
+    return uint128_divmod(n, d).quotient;
 }
 
 }} // namespace ztl::details
