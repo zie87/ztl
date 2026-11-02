@@ -214,34 +214,50 @@ constexpr REP remainder_reps(L lhs, R rhs) noexcept {
     return from_sign_magnitude<REP>(lhs < L{0}, magnitude(lhs) % magnitude(rhs));
 }
 
-template <rounding MODE_V, std::intmax_t FACTOR_V, std::intmax_t OFFSET_V, std::intmax_t DEN_V, typename REP,
-          typename T>
-constexpr REP affine_scale_wide(T val) noexcept {
+// val * FACTOR + OFFSET as sign + magnitude. |val * FACTOR| < 2^127 and
+// |OFFSET| < 2^63, so the magnitude always fits into 128 bits.
+struct signed_uint128 {
+    bool                    negative;
+    ::ztl::details::uint128 magnitude;
+};
+
+template <std::intmax_t FACTOR_V, std::intmax_t OFFSET_V, typename T>
+constexpr signed_uint128 affine_numerator(T val) noexcept {
     const std::uint64_t offset_mag = magnitude(OFFSET_V);
     const bool          offset_neg = OFFSET_V < 0;
 
     const ::ztl::details::uint128 product     = ::ztl::details::uint128_mul(magnitude(val), magnitude(FACTOR_V));
     const bool                    product_neg = (val < T{0}) != (FACTOR_V < 0);
 
-    // sum = product (+/-) offset, kept as sign + magnitude
-    bool                    sum_neg = product_neg;
-    ::ztl::details::uint128 sum     = product;
     if (product.hi == 0u && product.lo == 0u) {
-        sum_neg = offset_neg;
-        sum     = ::ztl::details::uint128{0u, offset_mag};
-    } else if (product_neg == offset_neg) {
-        sum = ::ztl::details::uint128_add(product, offset_mag);
-    } else if (::ztl::details::uint128_less(product, offset_mag)) {
-        sum_neg = offset_neg;
-        sum     = ::ztl::details::uint128{0u, offset_mag - product.lo};
-    } else {
-        sum = ::ztl::details::uint128_sub(product, offset_mag);
+        return signed_uint128{offset_neg, ::ztl::details::uint128{0u, offset_mag}};
     }
+    if (product_neg == offset_neg) {
+        return signed_uint128{product_neg, ::ztl::details::uint128_add(product, offset_mag)};
+    }
+    if (::ztl::details::uint128_less(product, offset_mag)) {
+        return signed_uint128{offset_neg, ::ztl::details::uint128{0u, offset_mag - product.lo}};
+    }
+    return signed_uint128{product_neg, ::ztl::details::uint128_sub(product, offset_mag)};
+}
 
+template <rounding MODE_V, std::intmax_t FACTOR_V, std::intmax_t OFFSET_V, std::intmax_t DEN_V, typename REP,
+          typename T>
+constexpr REP affine_scale_wide(T val) noexcept {
+    const signed_uint128                        sum = affine_numerator<FACTOR_V, OFFSET_V>(val);
     const ::ztl::details::uint128_divmod_result division =
-        ::ztl::details::uint128_divmod(sum, static_cast<std::uint64_t>(DEN_V));
-    return from_sign_magnitude<REP>(sum_neg, round_quotient<MODE_V>(sum_neg, division.quotient.lo, division.remainder,
-                                                                    static_cast<std::uint64_t>(DEN_V)));
+        ::ztl::details::uint128_divmod(sum.magnitude, static_cast<std::uint64_t>(DEN_V));
+    return from_sign_magnitude<REP>(sum.negative,
+                                    round_quotient<MODE_V>(sum.negative, division.quotient.lo, division.remainder,
+                                                           static_cast<std::uint64_t>(DEN_V)));
+}
+
+// true when val * FACTOR + OFFSET cannot overflow intmax_t
+template <std::intmax_t FACTOR_V, std::intmax_t OFFSET_V, typename T>
+constexpr bool fits_intmax(T val) noexcept {
+    return magnitude(val) <=
+           (static_cast<std::uint64_t>(std::numeric_limits<std::intmax_t>::max()) - magnitude(OFFSET_V)) /
+               magnitude(FACTOR_V);
 }
 
 template <rounding MODE_V, std::intmax_t FACTOR_V, std::intmax_t OFFSET_V, std::intmax_t DEN_V, typename REP,
@@ -259,14 +275,9 @@ constexpr REP affine_scale_narrow(std::intmax_t numerator) noexcept {
 template <rounding MODE_V, std::intmax_t FACTOR_V, std::intmax_t OFFSET_V, std::intmax_t DEN_V, typename REP,
           typename T>
 constexpr REP affine_scale(T val) noexcept {
-    // largest |val| for which val * FACTOR + OFFSET cannot overflow intmax_t
-    constexpr std::uint64_t narrow_limit =
-        (static_cast<std::uint64_t>(std::numeric_limits<std::intmax_t>::max()) - magnitude(OFFSET_V)) /
-        magnitude(FACTOR_V);
-
-    return magnitude(val) <= narrow_limit ? affine_scale_narrow<MODE_V, FACTOR_V, OFFSET_V, DEN_V, REP, T>(
-                                                static_cast<std::intmax_t>(val) * FACTOR_V + OFFSET_V)
-                                          : affine_scale_wide<MODE_V, FACTOR_V, OFFSET_V, DEN_V, REP>(val);
+    return fits_intmax<FACTOR_V, OFFSET_V>(val) ? affine_scale_narrow<MODE_V, FACTOR_V, OFFSET_V, DEN_V, REP, T>(
+                                                      static_cast<std::intmax_t>(val) * FACTOR_V + OFFSET_V)
+                                                : affine_scale_wide<MODE_V, FACTOR_V, OFFSET_V, DEN_V, REP>(val);
 }
 
 } // namespace details
@@ -277,6 +288,44 @@ using enable_unit_conversion_t =
     typename std::enable_if<is_unit<TARGET_T>::value && is_unit<SOURCE_T>::value &&
                                 std::is_same<quantity_of_t<TARGET_T>, quantity_of_t<SOURCE_T>>::value,
                             TARGET_T>::type;
+
+// --- exact comparison ---------------------------------------------------------
+constexpr int compare_magnitude(::ztl::details::uint128 a, ::ztl::details::uint128 b) noexcept {
+    return a.hi != b.hi ? (a.hi < b.hi ? -1 : 1) : a.lo != b.lo ? (a.lo < b.lo ? -1 : 1) : 0;
+}
+
+constexpr bool is_negative(const signed_uint128& v) noexcept {
+    return v.negative && (v.magnitude.hi != 0u || v.magnitude.lo != 0u);
+}
+
+constexpr int compare_signed(const signed_uint128& a, const signed_uint128& b) noexcept {
+    return is_negative(a) != is_negative(b) ? (is_negative(a) ? -1 : 1)
+           : is_negative(a)                 ? compare_magnitude(b.magnitude, a.magnitude)
+                                            : compare_magnitude(a.magnitude, b.magnitude);
+}
+
+template <typename T>
+constexpr int three_way(T a, T b) noexcept {
+    return a < b ? -1 : (b < a ? 1 : 0);
+}
+
+// Returns <0, 0 or >0 as lhs is less than, equal to or greater than rhs, using
+// the exact values (no truncation, overflow or signed/unsigned conversion).
+// rhs in lhs units is (rhs * factor + offset) / den, so lhs * den is compared
+// with rhs * factor + offset.
+template <typename LHS_T, typename RHS_T>
+constexpr int compare_units(const LHS_T& lhs, const RHS_T& rhs) noexcept {
+    using params    = conversion<LHS_T, RHS_T>;
+    using constants = affine_constants<typename params::scale, typename params::offset>;
+
+    return std::is_same<LHS_T, RHS_T>::value ? three_way(lhs.count(), static_cast<typename LHS_T::rep>(rhs.count()))
+           : (fits_intmax<constants::den, 0>(lhs.count()) &&
+              fits_intmax<constants::factor, constants::offset>(rhs.count()))
+               ? three_way(static_cast<std::intmax_t>(lhs.count()) * constants::den,
+                           static_cast<std::intmax_t>(rhs.count()) * constants::factor + constants::offset)
+               : compare_signed(affine_numerator<constants::den, 0>(lhs.count()),
+                                affine_numerator<constants::factor, constants::offset>(rhs.count()));
+}
 
 template <rounding MODE_V, typename TARGET_T, typename SOURCE_T>
 constexpr TARGET_T convert_unit(const SOURCE_T& v) {
@@ -419,11 +468,9 @@ struct common_unit {
     using common_ratio = std::ratio<gcd(ratio1::num, ratio2::num), lcm(ratio1::den, ratio2::den)>;
 
     // The common type always uses zero offset (absolute base, e.g. kelvin for
-    // temperature).  This avoids the old bug where two affine offsets were
-    // summed into a physically meaningless value, and it is correct for every
-    // use-site: unit_cast already resolves source/target offsets independently,
-    // so comparisons and arithmetic work regardless of the common type's own
-    // offset.
+    // temperature). It is only used for +, - and same-quantity /, which are
+    // restricted to zero-offset units; comparisons do not go through it (see
+    // details::compare_units), so truncating an offset here cannot affect them.
     using type = unit_trait<quantity_of_t<U1>, common_ratio, offset_trait<0>>;
 };
 
@@ -458,14 +505,13 @@ using common_type_t = typename common_type<U1, U2>::type;
 // ============================================================================
 //  Part 9 — Comparison operators
 // ============================================================================
-//  All comparisons convert both operands to the common type first,
-//  exactly like chrono::duration.
+//  Comparisons use the exact values (see details::compare_units), so they never
+//  truncate offsets, overflow the common rep or mix signed/unsigned reps.
 
 template <typename LHS_T, typename RHS_T>
 constexpr auto operator==(const LHS_T& lhs, const RHS_T& rhs) noexcept ->
     typename std::enable_if<is_quantity_compatible<LHS_T, RHS_T>::value, bool>::type {
-    using type = common_type_t<LHS_T, RHS_T>;
-    return unit_cast<type>(lhs).count() == unit_cast<type>(rhs).count();
+    return details::compare_units(lhs, rhs) == 0;
 }
 
 template <typename LHS_T, typename RHS_T>
@@ -477,8 +523,7 @@ constexpr auto operator!=(const LHS_T& lhs, const RHS_T& rhs) noexcept ->
 template <typename LHS_T, typename RHS_T>
 constexpr auto operator<(const LHS_T& lhs, const RHS_T& rhs) noexcept ->
     typename std::enable_if<is_quantity_compatible<LHS_T, RHS_T>::value, bool>::type {
-    using type = common_type_t<LHS_T, RHS_T>;
-    return unit_cast<type>(lhs).count() < unit_cast<type>(rhs).count();
+    return details::compare_units(lhs, rhs) < 0;
 }
 
 template <typename LHS_T, typename RHS_T>

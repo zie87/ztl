@@ -1140,3 +1140,59 @@ TEST_CASE("units convert implicitly only when the rep conversion does not narrow
     CHECK(widened.count() == -5);
     CHECK(unit_cast<volt_i8>(volt_i64(100)).count() == 100);
 }
+
+// ============================================================================
+//  comparisons are exact: no truncation, overflow or signedness surprises
+// ============================================================================
+
+TEST_CASE("comparisons of offset units use the exact value") {
+    using namespace ztl::units;
+
+    // 0 °C = 273.15 K
+    CHECK_FALSE(celsius(0) == kelvin(273));
+    CHECK(celsius(0) != kelvin(273));
+    CHECK(celsius(0) > kelvin(273));
+    CHECK(celsius(0) >= kelvin(273));
+    CHECK(celsius(0) < kelvin(274));
+    CHECK(kelvin(273) < celsius(0));
+    CHECK(kelvin(273) <= celsius(0));
+    CHECK(millikelvin(273150) == celsius(0));
+
+    // 0 K = -273.15 °C
+    CHECK(kelvin(0) < celsius(-273));
+    CHECK(kelvin(0) > celsius(-274));
+
+    // 0 °F = -17.78 °C, 32 °F = 0 °C
+    CHECK(fahrenheit(32) == celsius(0));
+    CHECK(fahrenheit(33) > celsius(0));
+    CHECK(fahrenheit(0) < celsius(-17));
+    CHECK(fahrenheit(0) > celsius(-18));
+
+    static_assert(celsius(0) > kelvin(273), "comparisons must stay constexpr");
+}
+
+TEST_CASE("comparisons do not overflow the common rep") {
+    using namespace ztl::units;
+
+    // 3e9 ms does not fit int; it used to wrap to -1294967296
+    CHECK(second(3000000) > millisecond(1));
+    CHECK_FALSE(second(3000000) == millisecond(-1294967296));
+    CHECK(second(-3000000) < millisecond(-1));
+    CHECK(second(std::numeric_limits<int>::max()) > millisecond(std::numeric_limits<int>::max()));
+
+    // radian vs microdegree needs the 128-bit path
+    CHECK(radian(26) > microdegree(1489690267));
+    CHECK(radian(26) < microdegree(1489690268));
+}
+
+TEST_CASE("comparisons keep the sign across signed and unsigned reps") {
+    using namespace ztl::units;
+    using volt_u32 = voltage<std::uint32_t>;
+    using volt_u64 = voltage<std::uint64_t>;
+
+    CHECK(volt_u32(1) > volt(-1));
+    CHECK(volt(-1) < volt_u32(0));
+    CHECK(volt_u64(std::numeric_limits<std::uint64_t>::max()) > voltage<std::int64_t>(-1));
+    CHECK(volt_u32(5) == volt(5));
+    CHECK(millivolt(-1) < volt_u32(0));
+}
