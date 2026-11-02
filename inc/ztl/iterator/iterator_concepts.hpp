@@ -263,12 +263,14 @@ struct bidirectional_iterator
     : bool_constant<forward_iterator<I>::value && concept_at_least<I, std::bidirectional_iterator_tag>::value &&
                     has_predecrement<I>::value && has_postdecrement<I>::value> {};
 
+// conjunction instead of &&: the operation probes are only instantiated for
+// bidirectional iterators. Otherwise e.g. has_ordering<int (*)()> would probe
+// function-pointer comparisons, which clang warns about even when unevaluated.
 template <typename I>
 struct random_access_iterator
-    : bool_constant<bidirectional_iterator<I>::value && concept_at_least<I, std::random_access_iterator_tag>::value &&
-                    has_plus_equal<I>::value && has_minus_equal<I>::value && has_plus<I>::value &&
-                    has_minus_n<I>::value && has_difference<I>::value && has_subscript<I>::value &&
-                    has_ordering<I>::value> {};
+    : bool_constant<conjunction<bidirectional_iterator<I>, concept_at_least<I, std::random_access_iterator_tag>,
+                                has_plus_equal<I>, has_minus_equal<I>, has_plus<I>, has_minus_n<I>, has_difference<I>,
+                                has_subscript<I>, has_ordering<I>>::value> {};
 
 // ---------------------------------------------------------------------------
 // Contiguous iterator support.

@@ -9,6 +9,7 @@
 #ifndef ZTL_CRC_HPP
 #define ZTL_CRC_HPP
 
+#include "ztl/macros.hpp"
 #include "ztl/narrow.hpp"
 
 #include <algorithm>
@@ -29,17 +30,17 @@ enum class crc_strategy { table, function };
 
 namespace details {
 template <typename T>
-[[nodiscard]] constexpr auto width() noexcept -> std::size_t {
+ZTL_NODISCARD constexpr auto width() noexcept -> std::size_t {
     return sizeof(T) * 8u;
 }
 
 template <typename T>
-[[nodiscard]] constexpr auto top_bit() noexcept -> T {
+ZTL_NODISCARD constexpr auto top_bit() noexcept -> T {
     return ::ztl::narrow_cast<T>(T{1u} << (width<T>() - 1u));
 }
 
 template <typename T>
-[[nodiscard]] constexpr auto reflect_value(T value) noexcept -> T {
+ZTL_NODISCARD constexpr auto reflect_value(T value) noexcept -> T {
     T result{};
 
     for (std::size_t bit = 0; bit < width<T>(); ++bit) {
@@ -62,7 +63,7 @@ struct byte_update<T, crc_bit_order::msb_first> {
     using value_type = T;
     using table_type = std::array<value_type, 256>;
 
-    [[nodiscard]] static constexpr auto table_entry(std::size_t dividend, value_type polynomial) noexcept
+    ZTL_NODISCARD static constexpr auto table_entry(std::size_t dividend, value_type polynomial) noexcept
         -> value_type {
         constexpr auto shift     = width<value_type>() - 8u;
         auto           remainder = ::ztl::narrow_cast<value_type>(dividend << shift);
@@ -104,7 +105,7 @@ struct byte_update<T, crc_bit_order::reflected> {
     using value_type = T;
     using table_type = std::array<value_type, 256>;
 
-    [[nodiscard]] static constexpr auto table_entry(std::size_t dividend, value_type polynomial) noexcept
+    ZTL_NODISCARD static constexpr auto table_entry(std::size_t dividend, value_type polynomial) noexcept
         -> value_type {
         auto remainder = ::ztl::narrow_cast<value_type>(dividend);
 
@@ -142,23 +143,23 @@ struct crc_table_generator_impl {
     using value_type = T;
     using table_type = std::array<value_type, 256>;
 
-    [[nodiscard]] constexpr auto operator()(std::size_t idx) const noexcept -> value_type { return M_TABLE[idx]; }
+    ZTL_NODISCARD constexpr auto operator()(std::size_t idx) const noexcept -> value_type { return M_TABLE[idx]; }
 
     constexpr void update(value_type& crc, std::uint8_t byte) const noexcept {
         details::byte_update<value_type, BIT_ORDER_V>::update_table(crc, byte, M_TABLE);
     }
 
 private:
-    [[nodiscard]] static constexpr auto generate_one(std::size_t dividend) noexcept -> value_type {
+    ZTL_NODISCARD static constexpr auto generate_one(std::size_t dividend) noexcept -> value_type {
         return details::byte_update<value_type, BIT_ORDER_V>::table_entry(dividend, POLYNOME_V);
     }
 
     template <std::size_t... INDICES>
-    [[nodiscard]] static constexpr auto generate(std::index_sequence<INDICES...>) noexcept -> table_type {
+    ZTL_NODISCARD static constexpr auto generate(std::index_sequence<INDICES...>) noexcept -> table_type {
         return table_type{{generate_one(INDICES)...}};
     }
 
-    [[nodiscard]] static constexpr auto generate() noexcept -> table_type {
+    ZTL_NODISCARD static constexpr auto generate() noexcept -> table_type {
         return generate(std::make_index_sequence<256>{});
     }
 
@@ -203,10 +204,10 @@ struct crc_base {
     constexpr crc_base() noexcept = default;
     constexpr explicit crc_base(generator_type generator) noexcept : m_generator(generator) {}
 
-    [[nodiscard]] static constexpr auto initial_value() noexcept -> value_type { return INITIAL_VALUE_V; }
-    [[nodiscard]] static constexpr auto final_xor_value() noexcept -> value_type { return FINAL_XOR_VALUE_V; }
+    ZTL_NODISCARD static constexpr auto initial_value() noexcept -> value_type { return INITIAL_VALUE_V; }
+    ZTL_NODISCARD static constexpr auto final_xor_value() noexcept -> value_type { return FINAL_XOR_VALUE_V; }
 
-    [[nodiscard]] static constexpr auto finalize(value_type crc) noexcept -> value_type {
+    ZTL_NODISCARD static constexpr auto finalize(value_type crc) noexcept -> value_type {
         return ::ztl::narrow_cast<value_type>(crc ^ FINAL_XOR_VALUE_V);
     }
 

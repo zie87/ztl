@@ -26,6 +26,17 @@ struct make_void {
 template <typename... T>
 using void_t = typename make_void<T...>::type;
 
+// NOTE: backport of C++17; short-circuits, so later traits are only
+// instantiated while all earlier ones are true.
+template <typename...>
+struct conjunction : std::true_type {};
+
+template <typename B>
+struct conjunction<B> : B {};
+
+template <typename B, typename... BS>
+struct conjunction<B, BS...> : std::conditional<static_cast<bool>(B::value), conjunction<BS...>, B>::type {};
+
 // NOTE: backport of C++20
 template <class T>
 using remove_cv_t = typename std::remove_cv<T>::type;

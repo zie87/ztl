@@ -18,6 +18,7 @@ ztl_test_exe = executable(
         'ztl/ring_buffer_tests.cpp',
         'ztl/serialize_tests.cpp',
         'ztl/span_tests.cpp',
+        'ztl/type_traits_tests.cpp',
         'ztl/units_tests.cpp',
         'ztl/utility_tests.cpp',
     ),
