@@ -76,7 +76,26 @@ namespace details {
 //     FACTOR, OFFSET and DEN are compile-time constants derived from the units.
 //     When val * FACTOR + OFFSET fits into intmax_t the plain arithmetic is used;
 //     otherwise the product is formed in 128 bits so that no intermediate value
-//     overflows. The quotient is truncated toward zero in both paths.
+//     overflows. MODE_V selects how the exact quotient is rounded.
+enum class rounding {
+    toward_zero,     // unit_cast  (std::chrono::duration_cast)
+    down,            // unit_floor (std::chrono::floor)
+    up,              // unit_ceil  (std::chrono::ceil)
+    to_nearest_even, // unit_round (std::chrono::round, ties to even)
+};
+
+// Adjusts the truncated magnitude q of an exact quotient with remainder r (0 <= r < den).
+template <rounding MODE_V>
+constexpr std::uint64_t round_quotient(bool negative, std::uint64_t q, std::uint64_t r, std::uint64_t den) noexcept {
+    return r == 0u                    ? q
+           : MODE_V == rounding::down ? (negative ? q + 1u : q)
+           : MODE_V == rounding::up   ? (negative ? q : q + 1u)
+           : MODE_V == rounding::to_nearest_even
+               // compare r with den - r instead of 2r with den, which could overflow
+               ? ((r > den - r || (r == den - r && (q & 1u) != 0u)) ? q + 1u : q)
+               : q;
+}
+
 constexpr bool intmax_mul_fits(std::intmax_t a, std::intmax_t b) noexcept {
     return a == 0 || b == 0 ||
            ::ztl::details::abs_val(a) <= std::numeric_limits<std::intmax_t>::max() / ::ztl::details::abs_val(b);
@@ -161,7 +180,8 @@ constexpr REP remainder_reps(L lhs, R rhs) noexcept {
     return from_sign_magnitude<REP>(lhs < L{0}, magnitude(lhs) % magnitude(rhs));
 }
 
-template <std::intmax_t FACTOR_V, std::intmax_t OFFSET_V, std::intmax_t DEN_V, typename REP, typename T>
+template <rounding MODE_V, std::intmax_t FACTOR_V, std::intmax_t OFFSET_V, std::intmax_t DEN_V, typename REP,
+          typename T>
 constexpr REP affine_scale_wide(T val) noexcept {
     const std::uint64_t offset_mag = magnitude(OFFSET_V);
     const bool          offset_neg = OFFSET_V < 0;
@@ -184,30 +204,48 @@ constexpr REP affine_scale_wide(T val) noexcept {
         sum = ::ztl::details::uint128_sub(product, offset_mag);
     }
 
-    const ::ztl::details::uint128 quotient =
-        (DEN_V == 1) ? sum : ::ztl::details::uint128_div(sum, static_cast<std::uint64_t>(DEN_V));
-    return from_sign_magnitude<REP>(sum_neg, quotient.lo);
+    const ::ztl::details::uint128_divmod_result division =
+        ::ztl::details::uint128_divmod(sum, static_cast<std::uint64_t>(DEN_V));
+    return from_sign_magnitude<REP>(sum_neg, round_quotient<MODE_V>(sum_neg, division.quotient.lo, division.remainder,
+                                                                    static_cast<std::uint64_t>(DEN_V)));
 }
 
-template <std::intmax_t FACTOR_V, std::intmax_t OFFSET_V, std::intmax_t DEN_V, typename REP, typename T>
+template <rounding MODE_V, std::intmax_t FACTOR_V, std::intmax_t OFFSET_V, std::intmax_t DEN_V, typename REP,
+          typename T>
+constexpr REP affine_scale_narrow(std::intmax_t numerator) noexcept {
+    return MODE_V == rounding::toward_zero
+               ? static_cast<REP>(numerator / DEN_V)
+               : from_sign_magnitude<REP>(
+                     numerator < 0,
+                     round_quotient<MODE_V>(numerator < 0, magnitude(numerator) / static_cast<std::uint64_t>(DEN_V),
+                                            magnitude(numerator) % static_cast<std::uint64_t>(DEN_V),
+                                            static_cast<std::uint64_t>(DEN_V)));
+}
+
+template <rounding MODE_V, std::intmax_t FACTOR_V, std::intmax_t OFFSET_V, std::intmax_t DEN_V, typename REP,
+          typename T>
 constexpr REP affine_scale(T val) noexcept {
     // largest |val| for which val * FACTOR + OFFSET cannot overflow intmax_t
     constexpr std::uint64_t narrow_limit =
         (static_cast<std::uint64_t>(std::numeric_limits<std::intmax_t>::max()) - magnitude(OFFSET_V)) /
         magnitude(FACTOR_V);
 
-    return magnitude(val) <= narrow_limit
-               ? static_cast<REP>((static_cast<std::intmax_t>(val) * FACTOR_V + OFFSET_V) / DEN_V)
-               : affine_scale_wide<FACTOR_V, OFFSET_V, DEN_V, REP>(val);
+    return magnitude(val) <= narrow_limit ? affine_scale_narrow<MODE_V, FACTOR_V, OFFSET_V, DEN_V, REP, T>(
+                                                static_cast<std::intmax_t>(val) * FACTOR_V + OFFSET_V)
+                                          : affine_scale_wide<MODE_V, FACTOR_V, OFFSET_V, DEN_V, REP>(val);
 }
 
 } // namespace details
 
+namespace details {
 template <typename TARGET_T, typename SOURCE_T>
-constexpr typename std::enable_if<is_unit<TARGET_T>::value && is_unit<SOURCE_T>::value &&
-                                      std::is_same<quantity_of_t<TARGET_T>, quantity_of_t<SOURCE_T>>::value,
-                                  TARGET_T>::type
-unit_cast(const SOURCE_T& v) {
+using enable_unit_conversion_t =
+    typename std::enable_if<is_unit<TARGET_T>::value && is_unit<SOURCE_T>::value &&
+                                std::is_same<quantity_of_t<TARGET_T>, quantity_of_t<SOURCE_T>>::value,
+                            TARGET_T>::type;
+
+template <rounding MODE_V, typename TARGET_T, typename SOURCE_T>
+constexpr TARGET_T convert_unit(const SOURCE_T& v) {
     using target_rep = typename TARGET_T::rep;
 
     using source_unit_trait = unit_trait_of_t<SOURCE_T>;
@@ -228,8 +266,33 @@ unit_cast(const SOURCE_T& v) {
         std::ratio_multiply<std::ratio<offset_value_of<target_unit_trait>::value>, target_offset_scale>,
         std::ratio_multiply<std::ratio<offset_value_of<source_unit_trait>::value>, source_offset_scale>>;
 
-    using constants = details::affine_constants<scale, offset>;
-    return TARGET_T(details::affine_scale<constants::factor, constants::offset, constants::den, target_rep>(v.count()));
+    using constants = affine_constants<scale, offset>;
+    return TARGET_T(affine_scale<MODE_V, constants::factor, constants::offset, constants::den, target_rep>(v.count()));
+}
+} // namespace details
+
+// Converts to TARGET_T, truncating toward zero (like std::chrono::duration_cast).
+template <typename TARGET_T, typename SOURCE_T>
+constexpr details::enable_unit_conversion_t<TARGET_T, SOURCE_T> unit_cast(const SOURCE_T& v) {
+    return details::convert_unit<details::rounding::toward_zero, TARGET_T>(v);
+}
+
+// Converts to TARGET_T, rounding toward negative infinity (like std::chrono::floor).
+template <typename TARGET_T, typename SOURCE_T>
+constexpr details::enable_unit_conversion_t<TARGET_T, SOURCE_T> unit_floor(const SOURCE_T& v) {
+    return details::convert_unit<details::rounding::down, TARGET_T>(v);
+}
+
+// Converts to TARGET_T, rounding toward positive infinity (like std::chrono::ceil).
+template <typename TARGET_T, typename SOURCE_T>
+constexpr details::enable_unit_conversion_t<TARGET_T, SOURCE_T> unit_ceil(const SOURCE_T& v) {
+    return details::convert_unit<details::rounding::up, TARGET_T>(v);
+}
+
+// Converts to TARGET_T, rounding to nearest with ties to even (like std::chrono::round).
+template <typename TARGET_T, typename SOURCE_T>
+constexpr details::enable_unit_conversion_t<TARGET_T, SOURCE_T> unit_round(const SOURCE_T& v) {
+    return details::convert_unit<details::rounding::to_nearest_even, TARGET_T>(v);
 }
 
 template <typename REP, typename UNIT>

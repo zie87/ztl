@@ -1021,3 +1021,73 @@ TEST_CASE("same-quantity addition, subtraction and division wrap instead of over
     CHECK(ztl::units::second(int_min) / ztl::units::second(-1) == int_min);
     CHECK(ztl::units::second(-7) / ztl::units::second(2) == -3);
 }
+
+// ============================================================================
+//  unit_floor / unit_ceil / unit_round  (mirror std::chrono::floor/ceil/round)
+// ============================================================================
+
+TEST_CASE("unit_floor, unit_ceil and unit_round pick the requested neighbour") {
+    using ztl::units::celsius;
+    using ztl::units::millicelsius;
+
+    // -1.5, -1.499, -1.501, 1.5, 2.5, -2.5, exact -2 and 0
+    CHECK(ztl::units::unit_floor<celsius>(millicelsius(-1500)).count() == -2);
+    CHECK(ztl::units::unit_ceil<celsius>(millicelsius(-1500)).count() == -1);
+    CHECK(ztl::units::unit_round<celsius>(millicelsius(-1500)).count() == -2);
+    CHECK(ztl::units::unit_round<celsius>(millicelsius(-1499)).count() == -1);
+    CHECK(ztl::units::unit_round<celsius>(millicelsius(-1501)).count() == -2);
+
+    CHECK(ztl::units::unit_floor<celsius>(millicelsius(1500)).count() == 1);
+    CHECK(ztl::units::unit_ceil<celsius>(millicelsius(1500)).count() == 2);
+    CHECK(ztl::units::unit_round<celsius>(millicelsius(1500)).count() == 2);
+
+    // ties go to the even neighbour, like std::chrono::round
+    CHECK(ztl::units::unit_round<celsius>(millicelsius(2500)).count() == 2);
+    CHECK(ztl::units::unit_round<celsius>(millicelsius(-2500)).count() == -2);
+
+    CHECK(ztl::units::unit_floor<celsius>(millicelsius(-2000)).count() == -2);
+    CHECK(ztl::units::unit_ceil<celsius>(millicelsius(-2000)).count() == -2);
+    CHECK(ztl::units::unit_round<celsius>(millicelsius(-2000)).count() == -2);
+    CHECK(ztl::units::unit_floor<celsius>(millicelsius(0)).count() == 0);
+    CHECK(ztl::units::unit_ceil<celsius>(millicelsius(0)).count() == 0);
+
+    // unit_cast keeps truncating toward zero
+    CHECK(ztl::units::unit_cast<celsius>(millicelsius(-1500)).count() == -1);
+}
+
+TEST_CASE("unit rounding applies to the exact value including offsets") {
+    using ztl::units::celsius;
+
+    // 0 K = -273.15 °C
+    CHECK(ztl::units::unit_floor<celsius>(ztl::units::kelvin(0)).count() == -274);
+    CHECK(ztl::units::unit_ceil<celsius>(ztl::units::kelvin(0)).count() == -273);
+    CHECK(ztl::units::unit_round<celsius>(ztl::units::kelvin(0)).count() == -273);
+
+    // 0 °F = -17.78 °C
+    CHECK(ztl::units::unit_floor<celsius>(ztl::units::fahrenheit(0)).count() == -18);
+    CHECK(ztl::units::unit_ceil<celsius>(ztl::units::fahrenheit(0)).count() == -17);
+    CHECK(ztl::units::unit_round<celsius>(ztl::units::fahrenheit(0)).count() == -18);
+
+    // 300 mmHg = 39996.7 Pa
+    CHECK(ztl::units::unit_floor<ztl::units::pascal>(ztl::units::millimeter_of_mercury(300)).count() == 39996);
+    CHECK(ztl::units::unit_ceil<ztl::units::pascal>(ztl::units::millimeter_of_mercury(300)).count() == 39997);
+    CHECK(ztl::units::unit_round<ztl::units::pascal>(ztl::units::millimeter_of_mercury(300)).count() == 39997);
+}
+
+TEST_CASE("unit rounding works on the wide path and in constant expressions") {
+    using ztl::units::microdegree;
+    using ztl::units::radian;
+
+    // 26 rad = 1489690267.38 µ°, needs the 128-bit path
+    CHECK(ztl::units::unit_floor<microdegree>(radian(26)).count() == 1489690267);
+    CHECK(ztl::units::unit_ceil<microdegree>(radian(26)).count() == 1489690268);
+    CHECK(ztl::units::unit_round<microdegree>(radian(26)).count() == 1489690267);
+    CHECK(ztl::units::unit_floor<microdegree>(radian(-26)).count() == -1489690268);
+    CHECK(ztl::units::unit_ceil<microdegree>(radian(-26)).count() == -1489690267);
+    CHECK(ztl::units::unit_round<microdegree>(radian(-26)).count() == -1489690267);
+
+    static_assert(ztl::units::unit_floor<ztl::units::celsius>(ztl::units::kelvin(0)).count() == -274,
+                  "unit_floor must be constexpr");
+    static_assert(ztl::units::unit_round<microdegree>(radian(-26)).count() == -1489690267,
+                  "unit_round must be constexpr on the wide path");
+}
