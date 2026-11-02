@@ -123,6 +123,44 @@ constexpr REP from_sign_magnitude(bool negative, std::uint64_t mag) noexcept {
                : static_cast<REP>(static_cast<std::intmax_t>(std::uint64_t{0} - mag));
 }
 
+// --- wrap-around integer arithmetic on reps ----------------------------------
+//     All unit arithmetic goes through these helpers so that no operation has
+//     undefined behaviour. Results that do not fit REP wrap like a static_cast;
+//     division and remainder work on sign + magnitude, so mixing signed reps with
+//     unsigned scalars keeps the mathematical sign (-9 / 3u == -3).
+template <typename REP>
+constexpr REP add_reps(REP lhs, REP rhs) noexcept {
+    using unsigned_rep = typename std::make_unsigned<REP>::type;
+    return static_cast<REP>(static_cast<unsigned_rep>(static_cast<unsigned_rep>(lhs) + static_cast<unsigned_rep>(rhs)));
+}
+
+template <typename REP>
+constexpr REP subtract_reps(REP lhs, REP rhs) noexcept {
+    using unsigned_rep = typename std::make_unsigned<REP>::type;
+    return static_cast<REP>(static_cast<unsigned_rep>(static_cast<unsigned_rep>(lhs) - static_cast<unsigned_rep>(rhs)));
+}
+
+template <typename REP, typename L, typename R>
+constexpr REP multiply_reps(L lhs, R rhs) noexcept {
+    const bool negative = (lhs < L{0}) != (rhs < R{0});
+    // two magnitudes of at most 32 bits each always fit into 64 bits
+    return (sizeof(L) <= 4 && sizeof(R) <= 4)
+               ? from_sign_magnitude<REP>(negative, magnitude(lhs) * magnitude(rhs))
+               : from_sign_magnitude<REP>(negative, ::ztl::details::uint128_mul(magnitude(lhs), magnitude(rhs)).lo);
+}
+
+// Truncates toward zero; the caller checks rhs != 0.
+template <typename REP, typename L, typename R>
+constexpr REP divide_reps(L lhs, R rhs) noexcept {
+    return from_sign_magnitude<REP>((lhs < L{0}) != (rhs < R{0}), magnitude(lhs) / magnitude(rhs));
+}
+
+// Sign follows the dividend, like the built-in %; the caller checks rhs != 0.
+template <typename REP, typename L, typename R>
+constexpr REP remainder_reps(L lhs, R rhs) noexcept {
+    return from_sign_magnitude<REP>(lhs < L{0}, magnitude(lhs) % magnitude(rhs));
+}
+
 template <std::intmax_t FACTOR_V, std::intmax_t OFFSET_V, std::intmax_t DEN_V, typename REP, typename T>
 constexpr REP affine_scale_wide(T val) noexcept {
     const std::uint64_t offset_mag = magnitude(OFFSET_V);
@@ -228,51 +266,54 @@ struct basic_unit {
 
     // --- compound assignment (same-unit only, like duration) ---
     constexpr basic_unit& operator+=(const basic_unit& rhs) {
-        m_value += rhs.m_value;
+        m_value = details::add_reps(m_value, rhs.m_value);
         return *this;
     }
     constexpr basic_unit& operator-=(const basic_unit& rhs) {
-        m_value -= rhs.m_value;
+        m_value = details::subtract_reps(m_value, rhs.m_value);
         return *this;
     }
     constexpr basic_unit& operator*=(REP s) {
-        m_value *= s;
+        m_value = details::multiply_reps<REP>(m_value, s);
         return *this;
     }
     constexpr basic_unit& operator/=(REP s) {
-        m_value /= s;
+        ZTL_EXPECTS(s != 0);
+        m_value = details::divide_reps<REP>(m_value, s);
         return *this;
     }
     constexpr basic_unit& operator%=(REP s) {
-        m_value %= s;
+        ZTL_EXPECTS(s != 0);
+        m_value = details::remainder_reps<REP>(m_value, s);
         return *this;
     }
     constexpr basic_unit& operator%=(const basic_unit& rhs) {
-        m_value %= rhs.m_value;
+        ZTL_EXPECTS(rhs.m_value != 0);
+        m_value = details::remainder_reps<REP>(m_value, rhs.m_value);
         return *this;
     }
 
     // unary
     constexpr basic_unit operator+() const { return *this; }
-    constexpr basic_unit operator-() const { return basic_unit(static_cast<REP>(-m_value)); }
+    constexpr basic_unit operator-() const { return basic_unit(details::subtract_reps(REP(0), m_value)); }
 
     // pre/post increment (like duration)
     constexpr basic_unit& operator++() {
-        ++m_value;
+        m_value = details::add_reps(m_value, REP(1));
         return *this;
     }
     constexpr basic_unit operator++(int) {
         basic_unit t(*this);
-        ++m_value;
+        ++*this;
         return t;
     }
     constexpr basic_unit& operator--() {
-        --m_value;
+        m_value = details::subtract_reps(m_value, REP(1));
         return *this;
     }
     constexpr basic_unit operator--(int) {
         basic_unit t(*this);
-        --m_value;
+        --*this;
         return t;
     }
 
@@ -385,14 +426,14 @@ template <typename LHS_T, typename RHS_T>
 constexpr auto operator+(const LHS_T& lhs, const RHS_T& rhs) noexcept ->
     typename std::enable_if<is_additive_compatible<LHS_T, RHS_T>::value, common_type_t<LHS_T, RHS_T>>::type {
     using type = common_type_t<LHS_T, RHS_T>;
-    return type(static_cast<typename type::rep>(unit_cast<type>(lhs).count() + unit_cast<type>(rhs).count()));
+    return type(details::add_reps(unit_cast<type>(lhs).count(), unit_cast<type>(rhs).count()));
 }
 
 template <typename LHS_T, typename RHS_T>
 constexpr auto operator-(const LHS_T& lhs, const RHS_T& rhs) noexcept ->
     typename std::enable_if<is_additive_compatible<LHS_T, RHS_T>::value, common_type_t<LHS_T, RHS_T>>::type {
     using type = common_type_t<LHS_T, RHS_T>;
-    return type(static_cast<typename type::rep>(unit_cast<type>(lhs).count() - unit_cast<type>(rhs).count()));
+    return type(details::subtract_reps(unit_cast<type>(lhs).count(), unit_cast<type>(rhs).count()));
 }
 
 // ============================================================================
@@ -402,25 +443,27 @@ constexpr auto operator-(const LHS_T& lhs, const RHS_T& rhs) noexcept ->
 template <typename V, typename S>
 constexpr auto operator*(const V& v, S s) noexcept ->
     typename std::enable_if<is_unit<V>::value && std::is_integral<S>::value, V>::type {
-    return V(static_cast<typename V::rep>(v.count() * s));
+    return V(details::multiply_reps<typename V::rep>(v.count(), s));
 }
 
 template <typename S, typename V>
 constexpr auto operator*(S s, const V& v) noexcept ->
     typename std::enable_if<is_unit<V>::value && std::is_integral<S>::value, V>::type {
-    return V(static_cast<typename V::rep>(v.count() * s));
+    return V(details::multiply_reps<typename V::rep>(v.count(), s));
 }
 
 template <typename V, typename S>
 constexpr auto operator/(const V& v, S s) noexcept ->
     typename std::enable_if<is_unit<V>::value && std::is_integral<S>::value, V>::type {
-    return V(static_cast<typename V::rep>(v.count() / s));
+    ZTL_EXPECTS(s != 0);
+    return V(details::divide_reps<typename V::rep>(v.count(), s));
 }
 
 template <typename V, typename S>
 constexpr auto operator%(const V& v, S s) noexcept ->
     typename std::enable_if<is_unit<V>::value && std::is_integral<S>::value, V>::type {
-    return V(static_cast<typename V::rep>(v.count() % s));
+    ZTL_EXPECTS(s != 0);
+    return V(details::remainder_reps<typename V::rep>(v.count(), s));
 }
 
 // Same-quantity division: returns the raw rep (a dimensionless scalar),
@@ -430,8 +473,10 @@ constexpr auto operator/(const LHS_T& lhs, const RHS_T& rhs) noexcept ->
     typename std::enable_if<is_quantity_compatible<LHS_T, RHS_T>::value && (offset_value_of<LHS_T>::value == 0) &&
                                 (offset_value_of<RHS_T>::value == 0),
                             typename LHS_T::rep>::type {
-    using result_type = common_type_t<LHS_T, RHS_T>;
-    return static_cast<typename LHS_T::rep>(unit_cast<result_type>(lhs).count() / unit_cast<result_type>(rhs).count());
+    using result_type  = common_type_t<LHS_T, RHS_T>;
+    const auto divisor = unit_cast<result_type>(rhs).count();
+    ZTL_EXPECTS(divisor != 0);
+    return details::divide_reps<typename LHS_T::rep>(unit_cast<result_type>(lhs).count(), divisor);
 }
 
 // ============================================================================
@@ -523,25 +568,6 @@ using unit_divide_t = typename unit_divide<U1, U2>::type;
 // ============================================================================
 //  Value<voltage> * Value<current>  →  Value<power>  (etc.)
 //  Only permitted when both operands have zero offset.
-
-namespace details {
-// --- exact integer product / quotient for cross-quantity * and / --------------
-//     Both work on sign + magnitude so that no intermediate value can overflow.
-//     Results that do not fit REP wrap like a static_cast (see from_sign_magnitude).
-template <typename REP, typename L, typename R>
-constexpr REP multiply_reps(L lhs, R rhs) noexcept {
-    const bool negative = (lhs < L{0}) != (rhs < R{0});
-    // two magnitudes of at most 32 bits each always fit into 64 bits
-    return (sizeof(L) <= 4 && sizeof(R) <= 4)
-               ? from_sign_magnitude<REP>(negative, magnitude(lhs) * magnitude(rhs))
-               : from_sign_magnitude<REP>(negative, ::ztl::details::uint128_mul(magnitude(lhs), magnitude(rhs)).lo);
-}
-
-template <typename REP, typename L, typename R>
-constexpr REP divide_reps(L lhs, R rhs) noexcept {
-    return from_sign_magnitude<REP>((lhs < L{0}) != (rhs < R{0}), magnitude(lhs) / magnitude(rhs));
-}
-} // namespace details
 
 // The result unit is the product of both ratios, so the counts multiply directly.
 template <typename LHS_T, typename RHS_T,

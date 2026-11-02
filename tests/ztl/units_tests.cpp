@@ -954,3 +954,70 @@ TEST_CASE("cross-quantity division truncates toward zero without overflow") {
     CHECK((volt_i64(std::numeric_limits<std::int64_t>::min()) / ampere_i64(-1)).count() ==
           std::numeric_limits<std::int64_t>::min());
 }
+
+// ============================================================================
+//  scalar, compound, unary and same-quantity arithmetic must be free of UB
+// ============================================================================
+
+TEST_CASE("scalar division and remainder keep the sign with unsigned scalars") {
+    // the usual arithmetic conversions turned -9 into 4294967287 before dividing
+    CHECK((ztl::units::millivolt(-9) / 3u).count() == -3);
+    CHECK((ztl::units::millivolt(-9) % 4u).count() == -1);
+    CHECK((ztl::units::millivolt(-9) * 3u).count() == -27);
+
+    ztl::units::millivolt value(-9);
+    value /= 3;
+    CHECK(value.count() == -3);
+}
+
+TEST_CASE("scalar and compound arithmetic wraps instead of overflowing") {
+    constexpr int int_max = std::numeric_limits<int>::max();
+    constexpr int int_min = std::numeric_limits<int>::min();
+
+    CHECK((ztl::units::second(int_max) * 2).count() == -2);
+    CHECK((2 * ztl::units::second(int_max)).count() == -2);
+    CHECK((ztl::units::second(1 << 20) * (std::int64_t{1} << 44)).count() == 0);
+    CHECK((ztl::units::second(int_min) / -1).count() == int_min);
+    CHECK((ztl::units::second(int_min) % -1).count() == 0);
+
+    ztl::units::second value(int_max);
+    value += ztl::units::second(1);
+    CHECK(value.count() == int_min);
+    value -= ztl::units::second(1);
+    CHECK(value.count() == int_max);
+    value *= 2;
+    CHECK(value.count() == -2);
+
+    value = ztl::units::second(int_min);
+    value /= -1;
+    CHECK(value.count() == int_min);
+    value %= -1;
+    CHECK(value.count() == 0);
+}
+
+TEST_CASE("unary minus and increment wrap at the limits") {
+    constexpr int int_max = std::numeric_limits<int>::max();
+    constexpr int int_min = std::numeric_limits<int>::min();
+
+    CHECK((-ztl::units::second(int_min)).count() == int_min);
+
+    ztl::units::second value(int_max);
+    ++value;
+    CHECK(value.count() == int_min);
+    --value;
+    CHECK(value.count() == int_max);
+    value++;
+    CHECK(value.count() == int_min);
+    value--;
+    CHECK(value.count() == int_max);
+}
+
+TEST_CASE("same-quantity addition, subtraction and division wrap instead of overflowing") {
+    constexpr int int_max = std::numeric_limits<int>::max();
+    constexpr int int_min = std::numeric_limits<int>::min();
+
+    CHECK((ztl::units::second(int_max) + ztl::units::second(1)).count() == int_min);
+    CHECK((ztl::units::second(int_min) - ztl::units::second(1)).count() == int_max);
+    CHECK(ztl::units::second(int_min) / ztl::units::second(-1) == int_min);
+    CHECK(ztl::units::second(-7) / ztl::units::second(2) == -3);
+}
