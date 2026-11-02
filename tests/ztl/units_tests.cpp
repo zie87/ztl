@@ -916,3 +916,41 @@ TEST_CASE("unit_cast with an offset does not overflow for large 64-bit values") 
     CHECK(ztl::units::unit_cast<kelvin_i64>(fahrenheit_i64(10000000000000000)).count() == 5555555555555810);
     CHECK(ztl::units::unit_cast<kelvin_i64>(fahrenheit_i64(-10000000000000000)).count() == -5555555555555300);
 }
+
+// ============================================================================
+//  cross-quantity * and / must be free of undefined behaviour for every rep
+// ============================================================================
+
+TEST_CASE("cross-quantity multiplication keeps sign and value for in-range results") {
+    using volt_i64   = ztl::units::voltage<std::int64_t>;
+    using ampere_i64 = ztl::units::current<std::int64_t>;
+    using volt_u64   = ztl::units::voltage<std::uint64_t>;
+    using ampere_u64 = ztl::units::current<std::uint64_t>;
+
+    CHECK((ztl::units::volt(-3) * ztl::units::ampere(2)).count() == -6);
+    CHECK((ztl::units::volt(-3) * ztl::units::ampere(-2)).count() == 6);
+    CHECK((volt_i64(3000000000) * ampere_i64(3000000000)).count() == 9000000000000000000);
+    CHECK((volt_u64(std::numeric_limits<std::uint64_t>::max()) * ampere_u64(1)).count() ==
+          std::numeric_limits<std::uint64_t>::max());
+}
+
+TEST_CASE("cross-quantity multiplication wraps instead of overflowing") {
+    using volt_i64   = ztl::units::voltage<std::int64_t>;
+    using ampere_i64 = ztl::units::current<std::int64_t>;
+
+    // 2^80 does not fit; the low bits are kept like a static_cast would (previously signed overflow)
+    CHECK((volt_i64(std::int64_t{1} << 40) * ampere_i64(std::int64_t{1} << 40)).count() == 0);
+    // int * int64 used to multiply in int64 and overflow
+    CHECK((ztl::units::volt(1 << 20) * ampere_i64(std::int64_t{1} << 44)).count() == 0);
+}
+
+TEST_CASE("cross-quantity division truncates toward zero without overflow") {
+    using volt_i64   = ztl::units::voltage<std::int64_t>;
+    using ampere_i64 = ztl::units::current<std::int64_t>;
+
+    CHECK((ztl::units::volt(-7) / ztl::units::ampere(2)).count() == -3);
+    CHECK((ztl::units::volt(7) / ztl::units::ampere(-2)).count() == -3);
+    // INT64_MIN / -1 used to be signed overflow
+    CHECK((volt_i64(std::numeric_limits<std::int64_t>::min()) / ampere_i64(-1)).count() ==
+          std::numeric_limits<std::int64_t>::min());
+}

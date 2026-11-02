@@ -35,12 +35,6 @@ constexpr unsigned find_msb(std::intmax_t v) {
     return find_msb_impl(abs_intmax(v), 0);
 }
 
-// --- ratio scaling (apply Num/Den to a value) --------------------------------
-template <typename Ratio, typename T>
-constexpr T ratio_scale(T val) {
-    return static_cast<T>((static_cast<std::intmax_t>(val) * Ratio::num) / Ratio::den);
-}
-
 // --- ratio_bitsize: how many bits the larger component needs -----------------
 template <typename Ratio>
 struct ratio_bitsize {

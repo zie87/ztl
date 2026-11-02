@@ -11,6 +11,7 @@
 
 #include "ztl/units/ratio.hpp"
 #include "ztl/units/unit_trait.hpp"
+#include "ztl/assert.hpp"
 #include "ztl/numeric.hpp"
 #include "ztl/details/uint128.hpp"
 
@@ -71,50 +72,6 @@ struct is_lossless<TARGET_T, SOURCE_T,
                                             0)>::type> : std::true_type {};
 
 namespace details {
-// --- promote-to-bigger type (portable, no per-type specializations) ----------
-//     Picks the next-wider standard integer.  At max width, stays put.
-template <std::size_t SIZE, bool SIGNED>
-struct bigger_by_size;
-template <>
-struct bigger_by_size<1, false> {
-    using type = std::uint16_t;
-};
-template <>
-struct bigger_by_size<2, false> {
-    using type = std::uint32_t;
-};
-template <>
-struct bigger_by_size<4, false> {
-    using type = std::uint64_t;
-};
-// NOTE: at 64-bit width the promotion is a no-op — there is no standard
-// type wider than (u)int64_t in C++14.  Overflow protection therefore
-// degrades silently for 64-bit reps.  If your toolchain offers __int128,
-// consider adding a specialization here.
-template <>
-struct bigger_by_size<8, false> {
-    using type = std::uint64_t;
-};
-template <>
-struct bigger_by_size<1, true> {
-    using type = std::int16_t;
-};
-template <>
-struct bigger_by_size<2, true> {
-    using type = std::int32_t;
-};
-template <>
-struct bigger_by_size<4, true> {
-    using type = std::int64_t;
-};
-template <>
-struct bigger_by_size<8, true> {
-    using type = std::int64_t;
-};
-
-template <typename T>
-using bigger_type_t = typename bigger_by_size<sizeof(T), std::is_signed<T>::value>::type;
-
 // --- exact affine scaling: result = (val * FACTOR + OFFSET) / DEN ------------
 //     FACTOR, OFFSET and DEN are compile-time constants derived from the units.
 //     When val * FACTOR + OFFSET fits into intmax_t the plain arithmetic is used;
@@ -567,33 +524,45 @@ using unit_divide_t = typename unit_divide<U1, U2>::type;
 //  Value<voltage> * Value<current>  →  Value<power>  (etc.)
 //  Only permitted when both operands have zero offset.
 
+namespace details {
+// --- exact integer product / quotient for cross-quantity * and / --------------
+//     Both work on sign + magnitude so that no intermediate value can overflow.
+//     Results that do not fit REP wrap like a static_cast (see from_sign_magnitude).
+template <typename REP, typename L, typename R>
+constexpr REP multiply_reps(L lhs, R rhs) noexcept {
+    const bool negative = (lhs < L{0}) != (rhs < R{0});
+    // two magnitudes of at most 32 bits each always fit into 64 bits
+    return (sizeof(L) <= 4 && sizeof(R) <= 4)
+               ? from_sign_magnitude<REP>(negative, magnitude(lhs) * magnitude(rhs))
+               : from_sign_magnitude<REP>(negative, ::ztl::details::uint128_mul(magnitude(lhs), magnitude(rhs)).lo);
+}
+
+template <typename REP, typename L, typename R>
+constexpr REP divide_reps(L lhs, R rhs) noexcept {
+    return from_sign_magnitude<REP>((lhs < L{0}) != (rhs < R{0}), magnitude(lhs) / magnitude(rhs));
+}
+} // namespace details
+
+// The result unit is the product of both ratios, so the counts multiply directly.
 template <typename LHS_T, typename RHS_T,
           typename std::enable_if<is_cross_quantity_multiply_compatible<LHS_T, RHS_T>::value, int>::type = 0>
 constexpr auto operator*(const LHS_T& lhs, const RHS_T& rhs) noexcept
     -> basic_unit<typename LHS_T::rep, details::unit_multiply_t<unit_trait_of_t<LHS_T>, unit_trait_of_t<RHS_T>>> {
-    using trait_type  = details::unit_multiply_t<unit_trait_of_t<LHS_T>, unit_trait_of_t<RHS_T>>;
-    using result_type = basic_unit<typename LHS_T::rep, trait_type>;
-    // Promote to a wider type before multiplying to reduce overflow risk
-    using wide_type = details::bigger_type_t<typename LHS_T::rep>;
-    return result_type(
-        static_cast<typename LHS_T::rep>(static_cast<wide_type>(lhs.count()) * static_cast<wide_type>(rhs.count())));
+    using result_type =
+        basic_unit<typename LHS_T::rep, details::unit_multiply_t<unit_trait_of_t<LHS_T>, unit_trait_of_t<RHS_T>>>;
+    return result_type(details::multiply_reps<typename LHS_T::rep>(lhs.count(), rhs.count()));
 }
 
+// The result unit is the quotient of both ratios, so the counts divide directly
+// (truncated toward zero).
 template <typename LHS_T, typename RHS_T,
           typename std::enable_if<is_cross_quantity_divide_compatible<LHS_T, RHS_T>::value, int>::type = 0>
-constexpr auto operator/(const LHS_T& lhs, const RHS_T& rhs)
+constexpr auto operator/(const LHS_T& lhs, const RHS_T& rhs) noexcept
     -> basic_unit<typename LHS_T::rep, details::unit_divide_t<unit_trait_of_t<LHS_T>, unit_trait_of_t<RHS_T>>> {
-    using trait_type  = details::unit_divide_t<unit_trait_of_t<LHS_T>, unit_trait_of_t<RHS_T>>;
-    using result_type = basic_unit<typename LHS_T::rep, trait_type>;
-
-    // Compute scaling to compensate for ratio differences
-    using lhs_scale  = std::ratio_divide<ratio_of_t<unit_trait_of_t<LHS_T>>, ratio_of_t<trait_type>>;
-    using full_scale = std::ratio_divide<lhs_scale, ratio_of_t<unit_trait_of_t<RHS_T>>>;
-
-    // Promote to a wider type before the ratio-scaled division
-    using wide_type = details::bigger_type_t<typename LHS_T::rep>;
-    return result_type(static_cast<typename LHS_T::rep>(
-        details::ratio_scale<full_scale>(static_cast<wide_type>(lhs.count())) / static_cast<wide_type>(rhs.count())));
+    using result_type =
+        basic_unit<typename LHS_T::rep, details::unit_divide_t<unit_trait_of_t<LHS_T>, unit_trait_of_t<RHS_T>>>;
+    ZTL_EXPECTS(rhs.count() != 0);
+    return result_type(details::divide_reps<typename LHS_T::rep>(lhs.count(), rhs.count()));
 }
 
 }} // namespace ztl::units
