@@ -59,17 +59,51 @@ struct offset_value_of<basic_unit<R, U>, void> {
     static constexpr auto value = offset_value_of<U>::value;
 };
 
+namespace details {
+// --- conversion parameters: target = source * scale + offset ------------------
+//     Both are exact ratios expressed in target units.
+template <typename TARGET_T, typename SOURCE_T>
+struct conversion {
+    using source_unit_trait = unit_trait_of_t<SOURCE_T>;
+    using target_unit_trait = unit_trait_of_t<TARGET_T>;
+    using target_ratio      = ratio_of_t<target_unit_trait>;
+
+    using scale = std::ratio_divide<ratio_of_t<source_unit_trait>, target_ratio>;
+
+    using source_offset_scale = std::ratio_divide<typename offset_of_t<source_unit_trait>::ratio_type, target_ratio>;
+    using target_offset_scale = std::ratio_divide<typename offset_of_t<target_unit_trait>::ratio_type, target_ratio>;
+
+    // target_offset * target_offset_scale - source_offset * source_offset_scale
+    using offset = std::ratio_subtract<
+        std::ratio_multiply<std::ratio<offset_value_of<target_unit_trait>::value>, target_offset_scale>,
+        std::ratio_multiply<std::ratio<offset_value_of<source_unit_trait>::value>, source_offset_scale>>;
+};
+
+// Every value of FROM is representable in TO (the rules of a non-narrowing
+// brace-initialisation between integer types).
+template <typename TO, typename FROM>
+struct is_non_narrowing_rep
+    : std::integral_constant<
+          bool, (std::is_signed<TO>::value == std::is_signed<FROM>::value && sizeof(TO) >= sizeof(FROM)) ||
+                    (std::is_signed<TO>::value && !std::is_signed<FROM>::value && sizeof(TO) > sizeof(FROM))> {};
+} // namespace details
+
 // --- lossless conversion check -----------------------------------------------
+//     A conversion is lossless (and therefore implicit) when the scale and the
+//     offset are whole numbers in the target unit and the rep does not narrow.
+//     Like std::chrono::duration, overflow from a large scale is not considered.
 template <typename TARGET_T, typename SOURCE_T, typename = void>
 struct is_lossless : std::false_type {};
 
 template <typename TARGET_T, typename SOURCE_T>
 struct is_lossless<TARGET_T, SOURCE_T,
                    typename std::enable_if<is_unit<TARGET_T>::value && is_unit<SOURCE_T>::value &&
-                                           std::is_same<quantity_of_t<TARGET_T>, quantity_of_t<SOURCE_T>>::value &&
-                                           (std::ratio_divide<ratio_of_t<SOURCE_T>, ratio_of_t<TARGET_T>>::num %
-                                                std::ratio_divide<ratio_of_t<SOURCE_T>, ratio_of_t<TARGET_T>>::den ==
-                                            0)>::type> : std::true_type {};
+                                           std::is_same<quantity_of_t<TARGET_T>, quantity_of_t<SOURCE_T>>::value>::type>
+    : std::integral_constant<bool,
+                             details::conversion<TARGET_T, SOURCE_T>::scale::den == 1 &&
+                                 details::conversion<TARGET_T, SOURCE_T>::offset::den == 1 &&
+                                 details::is_non_narrowing_rep<typename TARGET_T::rep, typename SOURCE_T::rep>::value> {
+};
 
 namespace details {
 // --- exact affine scaling: result = (val * FACTOR + OFFSET) / DEN ------------
@@ -248,25 +282,10 @@ template <rounding MODE_V, typename TARGET_T, typename SOURCE_T>
 constexpr TARGET_T convert_unit(const SOURCE_T& v) {
     using target_rep = typename TARGET_T::rep;
 
-    using source_unit_trait = unit_trait_of_t<SOURCE_T>;
-    using target_unit_trait = unit_trait_of_t<TARGET_T>;
-
-    using source_ratio = ratio_of_t<source_unit_trait>;
-    using target_ratio = ratio_of_t<target_unit_trait>;
-
-    // NOTE: the exact ratio must be used here. The arithmetic does not depend on
-    // the width of target_rep, so that width says nothing about how wide the ratio may be.
-    using scale = std::ratio_divide<source_ratio, target_ratio>;
-
-    using source_offset_scale = std::ratio_divide<typename offset_of_t<source_unit_trait>::ratio_type, target_ratio>;
-    using target_offset_scale = std::ratio_divide<typename offset_of_t<target_unit_trait>::ratio_type, target_ratio>;
-
-    // target = source * scale + (target_offset * target_offset_scale - source_offset * source_offset_scale)
-    using offset = std::ratio_subtract<
-        std::ratio_multiply<std::ratio<offset_value_of<target_unit_trait>::value>, target_offset_scale>,
-        std::ratio_multiply<std::ratio<offset_value_of<source_unit_trait>::value>, source_offset_scale>>;
-
-    using constants = affine_constants<scale, offset>;
+    // NOTE: the exact ratios must be used here. The arithmetic does not depend on
+    // the width of target_rep, so that width says nothing about how wide a ratio may be.
+    using params    = conversion<TARGET_T, SOURCE_T>;
+    using constants = affine_constants<typename params::scale, typename params::offset>;
     return TARGET_T(affine_scale<MODE_V, constants::factor, constants::offset, constants::den, target_rep>(v.count()));
 }
 } // namespace details

@@ -1091,3 +1091,52 @@ TEST_CASE("unit rounding works on the wide path and in constant expressions") {
     static_assert(ztl::units::unit_round<microdegree>(radian(-26)).count() == -1489690267,
                   "unit_round must be constexpr on the wide path");
 }
+
+// ============================================================================
+//  implicit conversion only when neither offset nor rep can lose information
+// ============================================================================
+
+TEST_CASE("offset units convert implicitly only when the offset is integral in the target") {
+    using namespace ztl::units;
+
+    // -273.15 °C / 255.37 K etc. are not whole numbers in the target unit
+    static_assert(!std::is_convertible<kelvin, celsius>::value, "K -> °C truncates the offset");
+    static_assert(!std::is_convertible<celsius, kelvin>::value, "°C -> K truncates the offset");
+    static_assert(!std::is_convertible<celsius, fahrenheit>::value, "°C -> °F truncates");
+    static_assert(!std::is_convertible<fahrenheit, kelvin>::value, "°F -> K truncates");
+    static_assert(!is_lossless<celsius, kelvin>::value, "is_lossless must see the offset");
+
+    // offsets that are whole numbers in the target stay implicit
+    static_assert(std::is_convertible<celsius, millicelsius>::value, "°C -> m°C is exact");
+    static_assert(std::is_convertible<kelvin, millicelsius>::value, "K -> m°C is exact (offset 273150 m°C)");
+    static_assert(std::is_convertible<millicelsius, microcelsius>::value, "m°C -> µ°C is exact");
+    static_assert(std::is_convertible<kelvin, millikelvin>::value, "K -> mK is exact");
+
+    millicelsius from_kelvin = kelvin(0);
+    CHECK(from_kelvin.count() == -273150);
+    CHECK(unit_cast<celsius>(kelvin(0)).count() == -273);
+}
+
+TEST_CASE("units convert implicitly only when the rep conversion does not narrow") {
+    using namespace ztl::units;
+    using volt_i8  = voltage<std::int8_t>;
+    using volt_i64 = voltage<std::int64_t>;
+    using volt_u16 = voltage<std::uint16_t>;
+    using volt_u32 = voltage<std::uint32_t>;
+
+    static_assert(!std::is_convertible<volt_i64, volt>::value, "int64 -> int narrows");
+    static_assert(!std::is_convertible<volt, volt_i8>::value, "int -> int8 narrows");
+    static_assert(!std::is_convertible<volt_u32, volt>::value, "uint32 -> int narrows");
+    static_assert(!std::is_convertible<volt, volt_u32>::value, "int -> uint32 loses the sign");
+    static_assert(!std::is_convertible<volt_i64, millivolt>::value, "a finer unit does not make narrowing safe");
+
+    static_assert(std::is_convertible<volt, volt_i64>::value, "int -> int64 widens");
+    static_assert(std::is_convertible<volt_i8, volt>::value, "int8 -> int widens");
+    static_assert(std::is_convertible<volt_u16, volt>::value, "uint16 -> int widens");
+    static_assert(std::is_convertible<volt_u16, volt_u32>::value, "uint16 -> uint32 widens");
+    static_assert(std::is_convertible<volt_i8, voltage<std::int64_t, std::milli>>::value, "widen and refine");
+
+    volt_i64 widened = volt(-5);
+    CHECK(widened.count() == -5);
+    CHECK(unit_cast<volt_i8>(volt_i64(100)).count() == 100);
+}
