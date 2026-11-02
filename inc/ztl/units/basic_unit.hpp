@@ -169,8 +169,9 @@ unit_cast(const SOURCE_T& v) {
     using source_ratio = ratio_of_t<source_unit_trait>;
     using target_ratio = ratio_of_t<target_unit_trait>;
 
-    using scale_raw = std::ratio_divide<source_ratio, target_ratio>;
-    using scale     = details::ratio_scale_down_t<scale_raw, sizeof(target_rep) * 8>;
+    // NOTE: the exact ratio must be used here. The arithmetic runs in intmax_t,
+    // so the width of target_rep says nothing about how wide the ratio may be.
+    using scale = std::ratio_divide<source_ratio, target_ratio>;
 
     using source_offset_ratio = typename offset_of_t<source_unit_trait>::ratio_type;
     using target_offset_ratio = typename offset_of_t<target_unit_trait>::ratio_type;
