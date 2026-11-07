@@ -22,21 +22,21 @@ template <typename Void, typename R, typename F, typename... Args>
 struct is_invocable_r_impl : std::false_type {};
 
 template <typename R, typename F, typename... Args>
-struct is_invocable_r_impl<::ztl::void_t<decltype(invoke(std::declval<F>(), std::declval<Args>()...))>, R, F, Args...>
+struct is_invocable_r_impl<::ztl::void_t<decltype(::ztl::invoke(std::declval<F>(), std::declval<Args>()...))>, R, F, Args...>
     : std::integral_constant<
           bool, std::is_void<R>::value ||
-                    std::is_convertible<decltype(invoke(std::declval<F>(), std::declval<Args>()...)), R>::value> {};
+                    std::is_convertible<decltype(::ztl::invoke(std::declval<F>(), std::declval<Args>()...)), R>::value> {};
 
 template <typename Void, typename R, typename F, typename... Args>
 struct is_nothrow_invocable_r_impl : std::false_type {};
 
 template <typename R, typename F, typename... Args>
-struct is_nothrow_invocable_r_impl<::ztl::void_t<decltype(invoke(std::declval<F>(), std::declval<Args>()...))>, R, F,
+struct is_nothrow_invocable_r_impl<::ztl::void_t<decltype(::ztl::invoke(std::declval<F>(), std::declval<Args>()...))>, R, F,
                                    Args...>
     : std::integral_constant<
           bool, (std::is_void<R>::value ||
-                 std::is_convertible<decltype(invoke(std::declval<F>(), std::declval<Args>()...)), R>::value) &&
-                    noexcept(invoke(std::declval<F>(), std::declval<Args>()...))> {};
+                 std::is_convertible<decltype(::ztl::invoke(std::declval<F>(), std::declval<Args>()...)), R>::value) &&
+                    noexcept(::ztl::invoke(std::declval<F>(), std::declval<Args>()...))> {};
 
 } // namespace details
 

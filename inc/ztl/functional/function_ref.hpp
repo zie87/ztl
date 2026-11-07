@@ -12,6 +12,7 @@
 #include "ztl/functional/invoke.hpp"
 
 #include "ztl/assert.hpp"
+#include "ztl/details/function_signature.hpp"
 #include "ztl/macros.hpp"
 #include "ztl/type_traits.hpp"
 #include "ztl/utility.hpp"
@@ -62,14 +63,11 @@ typename std::enable_if<std::is_function<T>::value, T*>::type entity_get(bound_e
     return reinterpret_cast<T*>(entity.fn_ptr);
 }
 
-template <bool Noexcept, typename R, typename F, typename... Args>
-struct invocable_selector : is_invocable_r<R, F, Args...> {};
-
-template <typename R, typename F, typename... Args>
-struct invocable_selector<true, R, F, Args...> : is_nothrow_invocable_r<R, F, Args...> {};
+template <typename SIG_T>
+class function_ref_base;
 
 template <bool Noexcept, typename R, typename... Args>
-class function_ref_base {
+class function_ref_base<function_signature<Noexcept, R, Args...>> {
     using bound_entity_t = bound_entity_type;
     using thunk_ptr_t    = R (*)(bound_entity_t, Args...);
 
@@ -140,30 +138,30 @@ public:
 private:
     template <typename F>
     static R function_ptr_thunk(bound_entity_t entity, Args... args) {
-        return invoke_r<R>(*entity_get<F>(entity), std::forward<Args>(args)...);
+        return ::ztl::invoke_r<R>(*entity_get<F>(entity), std::forward<Args>(args)...);
     }
 
     template <typename F>
     static R object_thunk(bound_entity_t entity, Args... args) {
         F& obj = *entity_get<F>(entity);
-        return invoke_r<R>(obj, std::forward<Args>(args)...);
+        return ::ztl::invoke_r<R>(obj, std::forward<Args>(args)...);
     }
 
     template <typename F, F f>
     static R nontype_thunk(bound_entity_t, Args... args) {
-        return invoke_r<R>(f, std::forward<Args>(args)...);
+        return ::ztl::invoke_r<R>(f, std::forward<Args>(args)...);
     }
 
     template <typename F, F f, typename T>
     static R nontype_object_thunk(bound_entity_t entity, Args... args) {
         T& obj = *entity_get<T>(entity);
-        return invoke_r<R>(f, obj, std::forward<Args>(args)...);
+        return ::ztl::invoke_r<R>(f, obj, std::forward<Args>(args)...);
     }
 
     template <typename F, F f, typename T>
     static R nontype_pointer_thunk(bound_entity_t entity, Args... args) {
         T* obj = entity_get<T>(entity);
-        return invoke_r<R>(f, obj, std::forward<Args>(args)...);
+        return ::ztl::invoke_r<R>(f, obj, std::forward<Args>(args)...);
     }
 
     bound_entity_t bound_entity_;
@@ -172,34 +170,11 @@ private:
 
 } // namespace details
 
-template <typename Signature>
-class function_ref;
-
-template <typename R, typename... Args>
-class function_ref<R(Args...)> : public details::function_ref_base<false, R, Args...> {
-    using base = details::function_ref_base<false, R, Args...>;
-
-public:
-    using base::base;
-
-    function_ref(const function_ref&) noexcept            = default;
-    function_ref& operator=(const function_ref&) noexcept = default;
-
-    template <typename T>
-    typename std::enable_if<!std::is_same<::ztl::remove_cvref_t<T>, function_ref>::value &&
-                                !std::is_pointer<typename std::decay<T>::type>::value &&
-                                !::ztl::is_nontype<::ztl::remove_cvref_t<T>>::value,
-                            function_ref&>::type
-    operator=(T&&) = delete;
-};
-
-// In standard C++14, noexcept is not part of the function type, so a portable
-// function_ref<R(Args...) noexcept> specialization cannot be implemented. If the
-// compiler supports C++17 noexcept function types, this branch is enabled.
-#if ZTL_FUNCTION_REF_HAS_NOEXCEPT_FUNCTION_TYPE
-template <typename R, typename... Args>
-class function_ref<R(Args...) noexcept> : public details::function_ref_base<true, R, Args...> {
-    using base = details::function_ref_base<true, R, Args...>;
+// Non-owning reference to a callable (P0792R14). `function_ref<R(Args...) noexcept>` is
+// available when the compiler supports C++17 noexcept function types.
+template <typename SIG_T>
+class function_ref : public details::function_ref_base<details::signature_of_t<SIG_T>> {
+    using base = details::function_ref_base<details::signature_of_t<SIG_T>>;
 
 public:
     using base::base;
@@ -214,7 +189,6 @@ public:
                             function_ref&>::type
     operator=(T&&) = delete;
 };
-#endif
 
 } // namespace ztl
 

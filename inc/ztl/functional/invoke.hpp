@@ -70,12 +70,12 @@ auto invoke(F&& f, Args&&... args) noexcept(noexcept(std::forward<F>(f)(std::for
 
 template <typename R, typename F, typename... Args>
 typename std::enable_if<!std::is_void<R>::value, R>::type invoke_r(F&& f, Args&&... args) {
-    return invoke(std::forward<F>(f), std::forward<Args>(args)...);
+    return ::ztl::invoke(std::forward<F>(f), std::forward<Args>(args)...);
 }
 
 template <typename R, typename F, typename... Args>
 typename std::enable_if<std::is_void<R>::value, void>::type invoke_r(F&& f, Args&&... args) {
-    invoke(std::forward<F>(f), std::forward<Args>(args)...);
+    ::ztl::invoke(std::forward<F>(f), std::forward<Args>(args)...);
 }
 } // namespace ztl
 

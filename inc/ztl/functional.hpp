@@ -11,5 +11,6 @@
 
 #include "ztl/functional/invoke.hpp"
 #include "ztl/functional/function_ref.hpp"
+#include "ztl/functional/inplace_function.hpp"
 
 #endif // ZTL_FUNCTIONAL_HPP
