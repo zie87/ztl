@@ -476,9 +476,14 @@ struct common_unit {
 
 } // namespace details
 
+// NOTE: conjunction short-circuits the instantiation, so these traits stay false (instead of
+// a hard error) for non-unit types. The unconstrained operator templates below are found by
+// ADL for any type that merely mentions a unit in its template arguments (e.g. mocks).
 template <typename U1, typename U2>
-struct is_quantity_compatible
-    : ztl::bool_constant<is_unit<U1>::value && is_unit<U2>::value && is_same_quantity<U1, U2>::value> {};
+struct is_quantity_compatible : ztl::conjunction<is_unit<U1>, is_unit<U2>, is_same_quantity<U1, U2>> {};
+
+template <typename U>
+struct has_zero_offset : ztl::bool_constant<offset_value_of<U>::value == 0> {};
 
 // Additive compatibility: same quantity AND both operands have zero offset.
 // Adding two absolute affine values (e.g. celsius + celsius) is physically
@@ -486,8 +491,7 @@ struct is_quantity_compatible
 // be represented as offset-free quantities (e.g. kelvin differences).
 template <typename U1, typename U2>
 struct is_additive_compatible
-    : ztl::bool_constant<is_quantity_compatible<U1, U2>::value && (offset_value_of<U1>::value == 0) &&
-                         (offset_value_of<U2>::value == 0)> {};
+    : ztl::conjunction<is_quantity_compatible<U1, U2>, has_zero_offset<U1>, has_zero_offset<U2>> {};
 
 template <typename U1, typename U2, typename = void>
 struct common_type; // undefined for non-Value types
