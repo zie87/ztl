@@ -138,30 +138,30 @@ public:
 private:
     template <typename F>
     static R function_ptr_thunk(bound_entity_t entity, Args... args) {
-        return invoke_r<R>(*entity_get<F>(entity), std::forward<Args>(args)...);
+        return ::ztl::invoke_r<R>(*entity_get<F>(entity), std::forward<Args>(args)...);
     }
 
     template <typename F>
     static R object_thunk(bound_entity_t entity, Args... args) {
         F& obj = *entity_get<F>(entity);
-        return invoke_r<R>(obj, std::forward<Args>(args)...);
+        return ::ztl::invoke_r<R>(obj, std::forward<Args>(args)...);
     }
 
     template <typename F, F f>
     static R nontype_thunk(bound_entity_t, Args... args) {
-        return invoke_r<R>(f, std::forward<Args>(args)...);
+        return ::ztl::invoke_r<R>(f, std::forward<Args>(args)...);
     }
 
     template <typename F, F f, typename T>
     static R nontype_object_thunk(bound_entity_t entity, Args... args) {
         T& obj = *entity_get<T>(entity);
-        return invoke_r<R>(f, obj, std::forward<Args>(args)...);
+        return ::ztl::invoke_r<R>(f, obj, std::forward<Args>(args)...);
     }
 
     template <typename F, F f, typename T>
     static R nontype_pointer_thunk(bound_entity_t entity, Args... args) {
         T* obj = entity_get<T>(entity);
-        return invoke_r<R>(f, obj, std::forward<Args>(args)...);
+        return ::ztl::invoke_r<R>(f, obj, std::forward<Args>(args)...);
     }
 
     bound_entity_t bound_entity_;

@@ -53,7 +53,7 @@ struct inplace_vtable {
 template <typename D, typename R, typename... ARG_Ts>
 struct inplace_target {
     static R call(void* storage, ARG_Ts&&... args) {
-        return invoke_r<R>(*static_cast<D*>(storage), std::forward<ARG_Ts>(args)...);
+        return ::ztl::invoke_r<R>(*static_cast<D*>(storage), std::forward<ARG_Ts>(args)...);
     }
 
     static void copy(void* dst, const void* src) { ::new (dst) D(*static_cast<const D*>(src)); }
